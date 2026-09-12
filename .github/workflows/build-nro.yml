@@ -24,7 +24,7 @@ jobs:
             devkitpro/devkita64:20260219 \
             bash -lc 'make && make TARGET=NCE-DIAG-CINC BUILD=build-cinc NCE_DIAG_DEFAULT_FIRST=1 NCE_DIAG_DEFAULT_LAST=1 && make -C microtests'
 
-      - name: Verify minimal startup and crash-observable executable shape
+      - name: Verify minimal startup and libc-independent crash checkpoints
         run: |
           set -euo pipefail
           test -s NCE-DIAG.nro
@@ -44,24 +44,26 @@ jobs:
               $NM NCE-DIAG.elf | grep -q nce_diag_filesystem_enable
               $NM NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001
               $NM NCE-DIAG.elf | grep -q nce_diag_checkpoint
+              $NM NCE-DIAG.elf | grep -q nce_diag_checkpointf
+              $NM NCE-DIAG.elf | grep -q nce_diag_logf
               $NM NCE-DIAG.elf | grep -q svcOutputDebugString
               ! $NM NCE-DIAG.elf | grep -q " consoleInit$"
+              ! $NM NCE-DIAG.elf | grep -Eq "__wrap_(main|nce_diag_set_run_id|vsnprintf|_svfprintf_r|_localeconv_r|strlen|memset|__getreent|__locale_mb_cur_max|_malloc_r)"
+              ! $NM NCE-DIAG.elf | grep -q nce_diag_pre_main_constructor_probe
+              ! $NM -u build/harness.o | grep -E "(^|[[:space:]])(snprintf|vsnprintf|_svfprintf_r|strlen|memset|malloc)$"
               $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<main>:/,/^$/p" > /tmp/nce_diag_main.disasm
               ! grep -Eiq "cntpct|cntvct" /tmp/nce_diag_main.disasm
               grep -q "nce_diag_set_run_id" /tmp/nce_diag_main.disasm
               grep -q "nce_diag_logf" /tmp/nce_diag_main.disasm
-              $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<nce_diag_pre_main_constructor_probe>:/,/^$/p" > /tmp/nce_diag_ctor.disasm
-              test "$(grep -Ec "[[:space:]]bl[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_ctor.disasm)" -eq 4
-              ! grep -Eq "[[:space:]]b[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_ctor.disasm
+              $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<nce_diag_checkpoint>:/,/^$/p" > /tmp/nce_diag_checkpoint.disasm
+              ! grep -Eiq "snprintf|vsnprintf|svfprintf|localeconv|malloc" /tmp/nce_diag_checkpoint.disasm
             '
           grep -aFq '0.2.1' NCE-DIAG.nro
           grep -aFq '00_APP_INIT_ENTER' NCE-DIAG.nro
           grep -aFq '10_PRE_SM_INIT' NCE-DIAG.nro
           grep -aFq '30_APP_INIT_DONE' NCE-DIAG.nro
-          grep -aFq '40_CTOR_ENTER' NCE-DIAG.nro
-          grep -aFq '41_CTOR_DONE' NCE-DIAG.nro
-          grep -aFq '42_POST_SECOND_RETURN' NCE-DIAG.nro
-          grep -aFq '43_TICK_OK' NCE-DIAG.nro
+          ! grep -aFq '40_CTOR_ENTER' NCE-DIAG.nro
+          ! grep -aFq '43_TICK_OK' NCE-DIAG.nro
           grep -aFq '10_PRE_SEQUENCE' NCE-DIAG.nro
           grep -aFq '30_PRE_SVC' NCE-DIAG.nro
           grep -aFq '40_POST_SVC' NCE-DIAG.nro

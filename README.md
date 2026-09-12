@@ -6,7 +6,7 @@ Independent internal guest-side conformance and diagnostic workload for Windows 
 
 Primary artifact: `NCE-DIAG.nro`.
 
-A second executable, `NCE-DIAG-CINC.nro`, runs registry index 1 only (`CPU.NZCV.CINC.001`) and is intended for the first isolated Eden retry.
+`NCE-DIAG-CINC.nro` runs registry index 1 only (`CPU.NZCV.CINC.001`) for isolated runtime validation.
 
 The primary diagnostic channel is direct `svcOutputDebugString` (SVC 0x27). GUI rendering is not required.
 
@@ -14,20 +14,26 @@ The primary diagnostic channel is direct `svcOutputDebugString` (SVC 0x27). GUI 
 
 The project overrides libnx's weak `__appInit` / `__appExit`.
 
-Default startup is now:
+Default startup is:
 
 ```text
 libnx core runtime
--> [BOOT] marker
+-> static BOOT marker
 -> SM initialize only
--> [BOOT] marker
+-> static BOOT marker
 -> main
 -> test harness
 ```
 
 Default startup does not initialize applet, HID, time, FS, SDMC, or a console framebuffer.
 
-This change was made after the previous 0.2 runtime log was symbolized to `_fsCmdGetSession` before `main()`, consistent with libnx default SD-card filesystem startup.
+### Crash-safe diagnostic output
+
+The stable debug path does not use libc formatted I/O. `nce_diag_logf`, `nce_diag_checkpoint`, and `nce_diag_checkpointf` format into fixed local buffers with project-owned integer/string conversion and then call `svcOutputDebugString` directly.
+
+This keeps the diagnostic reporter independent from the newlib `snprintf/vsnprintf/_svfprintf_r` path that was itself reached by earlier probe builds.
+
+Temporary constructor/main-wrapper/svfprintf dependency probes are not part of the stable executable.
 
 ### Test lifecycle
 
@@ -41,7 +47,7 @@ PASS / FAIL
 END
 ```
 
-CPU architectural-state-sensitive sequences are not interrupted by logging calls.
+CPU architectural-state-sensitive sequences are not interrupted by logging calls. If the emulator host terminates, the final emitted `CKPT <test-id> <checkpoint-id>` identifies the last confirmed guest boundary.
 
 ## Stable tests
 
@@ -51,7 +57,7 @@ CPU architectural-state-sensitive sequences are not interrupted by logging calls
 4. `IPC.SM.GET_SERVICE.001`
 5. `IPC.SVC21.REPEATED.001`
 
-No new testcase ID was added for 0.2.1.
+No testcase ID was added during crash-observability stabilization.
 
 ## Selection
 
@@ -59,7 +65,7 @@ Default `NCE-DIAG.nro`: registry indices 1-5.
 
 CINC-only executable: `NCE-DIAG-CINC.nro`.
 
-Runtime arguments remain available:
+Runtime arguments:
 
 ```text
 --all
@@ -68,6 +74,7 @@ Runtime arguments remain available:
 --persist
 --debug-only
 --config
+--no-config
 ```
 
 Filesystem config is deliberately opt-in. `nce_diag.cfg` is not read during default startup.
@@ -76,7 +83,7 @@ Filesystem config is deliberately opt-in. `nce_diag.cfg` is not read during defa
 
 Default mode is debug-only: no filesystem is initialized and no JSON is written.
 
-`--persist` or explicit config mode lazily enables FS/SDMC after the initial guest debug markers. FS startup itself has PRE/POST markers so an emulator crash there is observable.
+`--persist` or explicit config mode lazily enables FS/SDMC after the initial guest debug markers. Persistent file output is not the crash-boundary channel; direct SVC debug output is authoritative for host-process termination.
 
 Persistent mode can write:
 
@@ -106,5 +113,7 @@ General compile-time range preset:
 ```sh
 make TARGET=NCE-DIAG-RANGE BUILD=build-range NCE_DIAG_DEFAULT_FIRST=2 NCE_DIAG_DEFAULT_LAST=4
 ```
+
+CI verifies that the CINC `main()` does not read `CNTPCT`/`CNTVCT` and that `build/harness.o` has no dependency on `snprintf`, `vsnprintf`, `_svfprintf_r`, `strlen`, `memset`, or `malloc`.
 
 See `docs/CHECKPOINTS.md`, `docs/RUN_SELECTION.md`, `docs/TESTS.md`, and `docs/STARTUP_CRASH_20260912.md`.

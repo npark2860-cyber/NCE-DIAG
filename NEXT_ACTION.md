@@ -2,10 +2,10 @@
 
 Do not add new testcase IDs.
 
-1. Run the latest `NCE-DIAG-CINC.nro` built after removal of pre-marker `CNTPCT_EL0`.
-2. Keep config/persistence disabled; this run must remain debug-only and filesystem-free.
-3. Capture the Eden log from boot until exit/crash.
-4. Compare the final RunThread sequence with the previous constructor-probe run.
-5. Primary success criterion: execution progresses past the old constructor boundary and produces additional SVC 0x27 activity attributable to `main()` / harness logging, then reaches `CPU.NZCV.CINC.001`.
-6. If it still terminates before any new main/harness SVC boundary, symbolize the final guest PC against the matching retained ELF before changing another variable.
-7. Only after the CINC-only runtime boundary moves may the full suite be retried.
+1. Build and validate the libc-independent checkpoint commit in CI.
+2. Run the resulting `NCE-DIAG-CINC.nro` with config/persistence disabled.
+3. Capture the Eden log from boot until normal exit or host-process termination.
+4. Read the last `[NCE-DIAG]` line directly. The final `CKPT <test-id> <checkpoint-id>` is the crash boundary; no guest FAIL is inferred from a host crash.
+5. Primary success criterion: `CPU.NZCV.CINC.001` reaches `90_RESULT_RETURNED` and emits PASS/END without entering the former svfprintf probe path.
+6. If the host still terminates earlier, use the last named checkpoint as the next single-variable boundary. Do not reintroduce formatter dependency probes into the stable harness.
+7. After CINC-only is runtime-stable, run the full five-test suite unchanged.
