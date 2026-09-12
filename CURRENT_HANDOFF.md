@@ -6,32 +6,30 @@ Role: independent internal guest-side NCE diagnostic executable. Eden/Strato pro
 
 Current version: `0.2.1`.
 
-## Runtime evidence that changed the design
+## Runtime evidence
 
-The previous 0.2 executable loaded in Eden and entered Windows ARM64 NCE, but no `[NCE-DIAG]` marker reached the Eden log before the host process terminated.
+The original 0.2 executable terminated before `main()` in libnx default FS startup. Matching ELF symbolization placed the final guest PC in `_fsCmdGetSession`. 0.2.1 therefore replaced libnx default `__appInit` with an SM-only startup path.
 
-The final observed guest PCs were symbolized against the matching NCE-DIAG ELF:
+The next two Eden runs (full suite and CINC-only) showed the same normalized SVC progression and no FS startup path, proving the FS bypass was active.
 
-- `+0x9308`: `cmifMakeRequest`
-- `+0x9334`: `hipcParseResponse`
-- `+0x93AC`: `_fsCmdGetSession`
-- earlier `+0x93E0`: `serviceCreateDomainSubservice`
+A constructor-only probe was then added. The resulting Eden log continued beyond the previous boundary with additional SVC 0x27 RunThread returns. The current Eden RunThread diagnostic can observe one SVC boundary more than once, so these return records are not counted as one-to-one textual checkpoint lines; they are treated only as proof of additional guest progress.
 
-This is before `main()`. libnx 4.12 default `__appInit` initializes FS and mounts SDMC before main, so the diagnostic harness could not emit its first normal marker.
+Matching `NCE-DIAG-CINC.elf` disassembly exposed a stronger pre-marker boundary: `main()` executed `armGetSystemTick()` before its first normal diagnostic marker. libnx implements that helper as `MRS CNTPCT_EL0`. Thus the first architectural system-register read could terminate Windows NCE before `START version=...` was emitted.
 
-## 0.2.1 implementation
+## Current implementation
 
 - strong project-owned `__appInit` / `__appExit`
-- direct `[NCE-DIAG][BOOT]` markers from `__appInit`
 - startup initializes SM only
+- direct SVC 0x27 checkpoint channel
 - no default applet/HID/time/FS/SDMC/console path before main
-- FS is lazy and opt-in for config/persistence only
-- FS lazy-init has `PRE_FS_INIT`, `POST_FS_INIT`, `PRE_SD_MOUNT`, `POST_SD_MOUNT` markers
-- default debug-only run performs no file I/O
-- full-suite NRO plus CINC-only NRO from the same source
+- FS remains lazy and opt-in
+- full-suite and CINC-only executable NROs
 - stable testcase IDs unchanged
-- ELF/map retained in CI for future guest-PC symbolization
+- constructor boundary probe retained
+- pre-marker run-id generation no longer reads `CNTPCT_EL0`; it uses address/integer entropy only
+- CI disassembles CINC `main()` and rejects `CNTPCT`/`CNTVCT` reads before accepting the build
+- ELF/map artifacts retained for guest-PC symbolization
 
-Build validation: workflow run `34678637086` PASS at source commit `2f52e25135860e6fe25b9d027128dd2f4696810e`.
+Build validation: workflow run `34679720750` PASS at source commit `39a7fcd93b2c74ad58eda17d4338bcc1ff820dc6`. Manual artifact disassembly also confirmed no `cntpct`/`cntvct` instruction in CINC `main()`.
 
-Runtime status: 0.2.1 Eden retry pending. Do not add new testcase IDs before this retry.
+Runtime status: the no-CNTPCT build is the next required Eden run. Do not add new testcase IDs before this result is captured.
