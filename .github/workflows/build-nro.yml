@@ -65,6 +65,15 @@ jobs:
           path: NCE-DIAG.nro
           if-no-files-found: error
 
+      - name: Upload guest debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: NCE-DIAG-0.2-debug-symbols
+          path: |
+            NCE-DIAG.elf
+            build/*.map
+          if-no-files-found: error
+
       - name: Upload auxiliary raw microtest
         uses: actions/upload-artifact@v4
         with:
