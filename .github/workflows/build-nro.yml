@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/nce-diag-0.1-minimal
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
