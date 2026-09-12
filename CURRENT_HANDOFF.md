@@ -27,6 +27,23 @@ Subsequent CINC-only runs proved guest execution progressed through startup and 
 - CI checks the CINC `main()` for `CNTPCT`/`CNTVCT` and checks `build/harness.o` for forbidden formatted-libc dependencies
 - ELF/map artifacts are retained for guest-PC symbolization
 
+## Validated build
+
+Implementation commit: `446d0becca38fa6c8f64e83e7cf7bc1541a8be83` (`diag: make crash checkpoints libc-independent`).
+
+GitHub Actions run `34698719211`: PASS.
+
+The run passed:
+
+- default and CINC-only NRO build
+- libc-independent crash checkpoint validation
+- auxiliary raw instruction-shape validation
+- executable/debug-symbol/raw-microtest artifact upload
+
+Executable artifact: `NCE-DIAG-0.2.1-executables`, artifact ID `10299149605`, SHA-256 digest `d052bf3e67f850ccd495ede956753b80736591aac28773d95503c998413f9be4`.
+
 ## Runtime status
 
-The next required run is the CINC-only executable produced from the libc-independent checkpoint commit. Success is defined as observing named NCE-DIAG lifecycle/checkpoint text through `CPU.NZCV.CINC.001`; if Eden terminates, the last emitted `CKPT <test-id> <checkpoint-id>` is the authoritative diagnostic boundary.
+The next required action is runtime validation of `NCE-DIAG-CINC.nro` from the validated executable artifact with config/persistence disabled.
+
+Success is defined as observing named NCE-DIAG lifecycle/checkpoint text through `CPU.NZCV.CINC.001`. If Eden terminates, the last emitted `CKPT <test-id> <checkpoint-id>` is the authoritative diagnostic boundary.
