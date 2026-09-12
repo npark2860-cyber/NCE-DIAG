@@ -4,6 +4,27 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/*
+ * Crash-observability bootstrap override.
+ *
+ * main() used armGetSystemTick() to derive a run id before its first marker.
+ * libnx implements that helper as MRS CNTPCT_EL0, which is itself an NCE
+ * architectural path and therefore must not run before the harness can report
+ * that main was entered.  Keep the existing call site intact but replace it
+ * inside NCE-DIAG sources with address-derived entropy that uses ordinary guest
+ * integer/address instructions only.
+ */
+static inline uint64_t nce_diag_bootstrap_run_entropy(void) {
+    uintptr_t stack_entropy = (uintptr_t)&stack_entropy;
+    uintptr_t code_entropy = (uintptr_t)&nce_diag_bootstrap_run_entropy;
+    uint64_t value = (uint64_t)(stack_entropy ^ code_entropy);
+    value ^= value >> 17;
+    value ^= value << 11;
+    return value;
+}
+
+#define armGetSystemTick() nce_diag_bootstrap_run_entropy()
+
 typedef enum TestStatus {
     TEST_PASS = 0,
     TEST_FAIL = 1,
