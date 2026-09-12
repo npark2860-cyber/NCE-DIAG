@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build NRO and raw microtest with devkitA64
+      - name: Build executable NRO and auxiliary raw microtest
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/work" \
@@ -24,22 +24,37 @@ jobs:
             devkitpro/devkita64:20260219 \
             bash -lc 'make && make -C microtests'
 
-      - name: Verify artifacts and raw instruction shape
+      - name: Verify executable milestone shape
         run: |
           test -s NCE-DIAG.nro
+          test -s NCE-DIAG.elf
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            devkitpro/devkita64:20260219 \
+            bash -lc 'aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001 && aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_nzcv_csel_probe && aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_reg_preserve_probe'
+          strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CINC.001'
+          strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CSEL.001'
+          strings NCE-DIAG.nro | grep -q 'CPU.REG.PRESERVE.001'
+          strings NCE-DIAG.nro | grep -q 'IPC.SM.GET_SERVICE.001'
+          strings NCE-DIAG.nro | grep -q 'IPC.SVC21.REPEATED.001'
+          strings NCE-DIAG.nro | grep -q 'nce_diag_result.json'
+
+      - name: Verify auxiliary raw instruction shape
+        run: |
           test -s microtests/build/cpu_nzcv_cinc_001.elf
           test -s microtests/build/cpu_nzcv_cinc_001.bin
           test "$(stat -c%s microtests/build/cpu_nzcv_cinc_001.bin)" -le 256
           python3 scripts/verify_raw_sequence.py microtests/build/cpu_nzcv_cinc_001.disasm.txt
 
-      - name: Upload NRO
+      - name: Upload executable NRO
         uses: actions/upload-artifact@v4
         with:
-          name: NCE-DIAG-nro
+          name: NCE-DIAG-0.1-executable
           path: NCE-DIAG.nro
           if-no-files-found: error
 
-      - name: Upload raw microtest
+      - name: Upload auxiliary raw microtest
         uses: actions/upload-artifact@v4
         with:
           name: NCE-DIAG-raw-CPU-NZCV-CINC-001
