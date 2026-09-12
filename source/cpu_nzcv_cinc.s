@@ -1,6 +1,6 @@
 .text
 .align 2
-.include "cpu_nzcv_cinc_core.inc"
+.include "../include/cpu_nzcv_cinc_core.inc"
 .global nce_diag_cpu_nzcv_cinc_probe
 .type nce_diag_cpu_nzcv_cinc_probe, %function
 nce_diag_cpu_nzcv_cinc_probe:
