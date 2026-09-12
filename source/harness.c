@@ -20,8 +20,45 @@ uint32_t nce_diag_get_run_id(void) {
     return g_run_id;
 }
 
-static void emit_line(const char *line, size_t len) {
+static size_t format_line(char *line, size_t line_size, const char *fmt, va_list args) {
+    char body[256];
+    const int body_rc = vsnprintf(body, sizeof(body), fmt, args);
+    if (body_rc < 0) {
+        return 0;
+    }
+
+    const int line_rc = snprintf(
+        line,
+        line_size,
+        "[NCE-DIAG][RUN=%06u] %s",
+        g_run_id,
+        body);
+
+    if (line_rc < 0) {
+        return 0;
+    }
+
+    size_t len = (size_t)line_rc;
+    if (len >= line_size) {
+        len = line_size - 1;
+    }
+
+    if (len == 0 || line[len - 1] != '\n') {
+        if (len + 1 < line_size) {
+            line[len++] = '\n';
+            line[len] = '\0';
+        }
+    }
+
+    return len;
+}
+
+static void emit_debug_only(const char *line, size_t len) {
     (void)svcOutputDebugString(line, (u64)len);
+}
+
+static void emit_lifecycle(const char *line, size_t len) {
+    emit_debug_only(line, len);
 
     if (g_journal) {
         (void)fwrite(line, 1, len, g_journal);
@@ -30,46 +67,40 @@ static void emit_line(const char *line, size_t len) {
 }
 
 void nce_diag_logf(const char *fmt, ...) {
-    char body[256];
     char line[352];
 
     va_list args;
     va_start(args, fmt);
-    const int body_rc = vsnprintf(body, sizeof(body), fmt, args);
+    const size_t len = format_line(line, sizeof(line), fmt, args);
     va_end(args);
 
-    if (body_rc < 0) {
-        return;
+    if (len != 0) {
+        emit_lifecycle(line, len);
     }
+}
 
-    int line_rc = snprintf(
+void nce_diag_checkpoint(const char *test_id, const char *checkpoint_id) {
+    char line[352];
+    const int rc = snprintf(
         line,
         sizeof(line),
-        "[NCE-DIAG][RUN=%06u] %s",
+        "[NCE-DIAG][RUN=%06u] CKPT %s %s\n",
         g_run_id,
-        body);
+        test_id,
+        checkpoint_id);
 
-    if (line_rc < 0) {
+    if (rc <= 0) {
         return;
     }
 
-    size_t len = (size_t)line_rc;
+    size_t len = (size_t)rc;
     if (len >= sizeof(line)) {
         len = sizeof(line) - 1;
     }
 
-    if (len == 0 || line[len - 1] != '\n') {
-        if (len + 1 < sizeof(line)) {
-            line[len++] = '\n';
-            line[len] = '\0';
-        }
-    }
-
-    emit_line(line, len);
-}
-
-void nce_diag_checkpoint(const char *test_id, const char *checkpoint_id) {
-    nce_diag_logf("CKPT %s %s", test_id, checkpoint_id);
+    // Checkpoints are deliberately debug-only. Persistent file I/O here could
+    // overwrite the TLS IPC request buffer between REQUEST_BUILT and PRE_SVC.
+    emit_debug_only(line, len);
 }
 
 void nce_diag_checkpointf(
@@ -78,18 +109,37 @@ void nce_diag_checkpointf(
     const char *fmt,
     ...) {
     char detail[128];
+    char line[352];
 
     va_list args;
     va_start(args, fmt);
-    const int rc = vsnprintf(detail, sizeof(detail), fmt, args);
+    const int detail_rc = vsnprintf(detail, sizeof(detail), fmt, args);
     va_end(args);
 
-    if (rc < 0) {
+    if (detail_rc < 0) {
         nce_diag_checkpoint(test_id, checkpoint_id);
         return;
     }
 
-    nce_diag_logf("CKPT %s %s %s", test_id, checkpoint_id, detail);
+    const int rc = snprintf(
+        line,
+        sizeof(line),
+        "[NCE-DIAG][RUN=%06u] CKPT %s %s %s\n",
+        g_run_id,
+        test_id,
+        checkpoint_id,
+        detail);
+
+    if (rc <= 0) {
+        return;
+    }
+
+    size_t len = (size_t)rc;
+    if (len >= sizeof(line)) {
+        len = sizeof(line) - 1;
+    }
+
+    emit_debug_only(line, len);
 }
 
 bool nce_diag_persistence_enable(void) {
