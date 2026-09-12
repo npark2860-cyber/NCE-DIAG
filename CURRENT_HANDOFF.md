@@ -2,14 +2,17 @@
 
 Branch: `feat/nce-diag-0.1-minimal`
 
+Project role: private/internal guest-side conformance and diagnostic bench for Windows ARM64 NCE. It is not constrained to public homebrew APIs. Authorized internal references may be used when needed, while Eden/Strato production code remains read-only from this project.
+
 Current stage: minimal harness plus `CPU.NZCV.CINC.001` only.
 
 Implemented:
 
-- devkitA64/libnx NRO Makefile structure
+- devkitA64/libnx NRO bootstrap Makefile structure
 - common `TestResult` harness shape
 - fixed AArch64 assembly probe for the first NZCV/CINC regression
 - human-readable PASS/FAIL summary and detailed failure state
+- GitHub Actions NRO build validation path
 
 Static validation performed before commit:
 
@@ -20,6 +23,8 @@ Static validation performed before commit:
 Not yet claimed:
 
 - devkitA64/libnx full NRO build PASS
-- execution PASS on real Switch, Android/Linux ARM64 Eden, or Windows ARM64 Eden NCE
-- JSON/text SD-card result file
+- execution PASS on a known-good reference or Windows ARM64 Eden NCE
+- JSON/text machine-readable result output
 - any test beyond `CPU.NZCV.CINC.001`
+
+Do not add the next semantic until the current probe is built and runtime-validated.
