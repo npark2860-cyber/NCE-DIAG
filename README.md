@@ -2,61 +2,80 @@
 
 Independent internal guest-side conformance and diagnostic workload for Windows ARM64 NCE validation.
 
-NCE-DIAG is not a public homebrew product. Its purpose is to reduce large-game failures to small deterministic tests that exercise one CPU, SVC, IPC, exception, or memory semantic at a time and report expected/actual state.
+NCE-DIAG is an executable diagnostic application, not a source-only or raw-blob project. The primary deliverable is `NCE-DIAG.nro`, which runs the test suite automatically, prints PASS/FAIL, writes a machine-readable result file, and exits without user input.
 
-The project is intentionally separate from Eden/Strato production implementation code. Eden/Strato may be used as reference and comparison targets, but failures found here are not fixed in those repositories from this project.
+Eden/Strato production implementation repositories are reference-only from this project.
 
-NCE-DIAG is not limited to libnx abstractions. Public devkitA64/libnx/switchbrew material remains useful for bootstrap paths, while authorized internal references such as user-provided firmware/title dumps, NSO/NPDM/ExeFS, ABI/API material, binaries, disassembly, logs, known-good runtime captures, and real-hardware results may also be used when needed.
+## 0.1 executable target
 
-## Test status
+Current build candidate contains all first-milestone tests:
 
-| Test ID | Semantic | Implementation | Build | Runtime |
-| --- | --- | --- | --- | --- |
-| `CPU.NZCV.CINC.001` | NZCV preservation across x18-sensitive store-pair sequence | raw + NRO | PASS | pending |
-| `CPU.NZCV.CSEL.001` | conditional select | planned | - | - |
-| `CPU.X18.TRANSITION.001` | x18-sensitive transition | planned | - | - |
-| `IPC.SM.GET_SERVICE.001` | GetService handle path | planned | - | - |
-| `IPC.HIPC.MOVE_HANDLE.001` | moved handle parsing | planned | - | - |
-| `IPC.DOMAIN.CONVERT.001` | session to domain | planned | - | - |
-| `EXC.RESUME.001` | exception resume | planned | - | - |
+| Test ID | Semantic | Implementation | Runtime validation |
+| --- | --- | --- | --- |
+| `CPU.NZCV.CINC.001` | NZCV preservation through x18-sensitive STP before CINC | embedded raw ARM64 routine | pending |
+| `CPU.NZCV.CSEL.001` | conditional select and NZCV preservation | ARM64 routine | pending |
+| `CPU.REG.PRESERVE.001` | x19-x28 preservation across direct BL/RET | ARM64 routine | pending |
+| `IPC.SM.GET_SERVICE.001` | real SM GetService moved-handle path | libnx CMIF over real SM session | pending |
+| `IPC.SVC21.REPEATED.001` | repeated synchronous IPC on one SM session | 16 repeated CMIF GetService requests | pending |
 
-## CPU.NZCV.CINC.001
+## Automatic execution flow
 
-The semantic core is shared by the raw microtest and NRO runner:
-
-```asm
-cmp     w16, #0
-mrs     x10, nzcv
-stp     w17, w18, [base, #0x0c]
-mrs     x11, nzcv
-mov     w2, #2
-cinc    w2, w2, ne
+```text
+NCE-DIAG.nro
+  -> start
+  -> run all five tests
+  -> print per-test PASS/FAIL
+  -> print summary
+  -> write sdmc:/nce_diag_result.json
+     (fallback: nce_diag_result.json)
+  -> exit automatically
 ```
 
-For `w16 = 0`:
+No controller input is required.
 
-- expected result: `2`
-- expected NZCV before `stp`: `0x60000000`
-- expected NZCV after `stp`: `0x60000000`
+## Build baseline
 
-### Raw layer
+Validated GitHub Actions run: `34676758424`
 
-`microtests/cpu_nzcv_cinc_001.s` builds to standalone ELF/BIN artifacts without libc/libnx/C runtime dependency. The runner supplies a writable result buffer in `x0`. See `docs/RAW_MICROTEST_ABI.md`.
+Validated source HEAD for the executable artifact: `b557e6139dae7b92182c4f51df3bd51793912406`
 
-### NRO bootstrap layer
+Primary artifact: `NCE-DIAG-0.1-executable`, artifact ID `10292253583`.
 
-The devkitA64/libnx NRO provides a convenient screen runner for the same semantic. This is a bootstrap choice, not a permanent API restriction.
+`NCE-DIAG.nro` SHA-256:
+
+```text
+ed16d5872ca1b3ddab3aebd9388db448fb2b0b054047a1ea0941007f66c026d7
+```
+
+CI verifies:
+
+- `NCE-DIAG.nro` exists and is non-empty
+- embedded raw CINC symbol exists in the executable ELF
+- CSEL and register-preservation assembly symbols exist
+- all five stable test IDs are present in the NRO
+- result-file path is present
+- auxiliary raw CINC microtest still matches the intended instruction sequence
+
+## Build
+
+Requirements: devkitPro, devkitA64, libnx.
 
 ```sh
 make
-make -C microtests
 ```
 
-Current build validation:
+Primary output:
 
-- workflow run: `34676469257`
-- validated SHA: `564fc12b7389f672cb50f0137c01f4183b061784`
-- NRO artifact: `10292192995`
-- raw artifact: `10292208003`
+```text
+NCE-DIAG.nro
+```
 
-Runtime differential validation is the next step. No second semantic should be added before this first raw/NRO pair is executed in a known-good reference and Windows ARM64 Eden NCE.
+The standalone raw ELF/BIN remains an auxiliary development artifact only. It is not the user-facing completion target.
+
+## Completion state
+
+Executable build/packaging: PASS.
+
+Eden/real-Switch runtime execution: pending.
+
+NCE-DIAG 0.1 is not considered complete until the same NRO boots in Eden, executes all five tests, writes the result file, and exits normally.

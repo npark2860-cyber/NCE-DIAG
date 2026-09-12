@@ -1,30 +1,25 @@
 # Test registry
 
-| Test ID | Semantic | Raw | NRO | Build | Runtime |
-| --- | --- | --- | --- | --- | --- |
-| CPU.NZCV.CINC.001 | Preserve NZCV across the x18-sensitive store-pair sequence before `cinc` | implemented | implemented | PASS | pending |
-| CPU.NZCV.CSEL.001 | Conditional select | planned | planned | - | - |
-| CPU.REG.PRESERVE.001 | Register preservation | planned | planned | - | - |
-| IPC.SM.GET_SERVICE.001 | Service handle return | planned | planned | - | - |
-| IPC.SVC21.REPEATED.001 | Repeated session IPC | planned | planned | - | - |
+| Test ID | Input / action | Expected | Runtime status |
+| --- | --- | --- | --- |
+| `CPU.NZCV.CINC.001` | `w16=0`, CMP -> x18-sensitive STP -> CINC NE | result `2`, NZCV `0x60000000` preserved | pending |
+| `CPU.NZCV.CSEL.001` | compare `5` and `7`, CSEL LT | result `5`, NZCV `0x80000000` preserved | pending |
+| `CPU.REG.PRESERVE.001` | seed x19-x28, direct BL/RET, compare | mismatch mask `0` | pending |
+| `IPC.SM.GET_SERVICE.001` | CMIF `sm:GetServiceOriginal("fsp-srv")` | valid moved handle, close succeeds | pending |
+| `IPC.SVC21.REPEATED.001` | 16 repeated GetService requests on the same SM session | 16/16 complete | pending |
 
-## CPU.NZCV.CINC.001
+All five tests are included in the executable NRO and are executed automatically in the order above.
 
-Input: `w16 = 0`.
+## Output contract
 
-Expected result: `2`.
+Each test returns:
 
-Expected NZCV immediately after `cmp w16, #0`: `0x60000000` (`Z=1`, `C=1`).
+- stable ID
+- PASS/FAIL/SKIP
+- expected
+- actual
+- Result code
+- NZCV before/after when relevant
+- diagnostic detail string
 
-The shared semantic core snapshots NZCV before and after `stp w17, w18, [base, #0x0c]`. Both snapshots must remain `0x60000000`, and `cinc ..., ne` must not increment the value.
-
-Raw result ABI is documented in `RAW_MICROTEST_ABI.md`.
-
-Build validation:
-
-- workflow run `34676469257`: PASS
-- validated SHA `564fc12b7389f672cb50f0137c01f4183b061784`
-- NRO artifact `10292192995`
-- raw artifact `10292208003`
-
-Runtime reference comparison remains pending.
+The executable writes a JSON result object containing summary counts and all test records.

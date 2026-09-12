@@ -2,41 +2,50 @@
 
 Branch: `feat/nce-diag-0.1-minimal`
 
-Project role: private/internal guest-side conformance and diagnostic bench for Windows ARM64 NCE. Eden/Strato production code remains read-only from this project.
+Current HEAD before this documentation commit: `b557e6139dae7b92182c4f51df3bd51793912406`.
 
-Current scope remains exactly one semantic: `CPU.NZCV.CINC.001`.
+Project role: internal executable guest-side conformance/diagnostic bench for Windows ARM64 NCE. Eden/Strato production code is not modified here.
 
-Implemented layers:
+## Current executable state
 
-- standalone raw ARM64 microtest
-- devkitA64/libnx NRO bootstrap runner
-- shared assembly macro for the measured core
-- fixed raw result ABI with compile-time offset/size assertions
-- compiled instruction-order verification
-- CI artifact production for both raw and NRO forms
+`NCE-DIAG.nro` is now the primary target and contains all first-milestone tests:
 
-Validated build baseline:
+- `CPU.NZCV.CINC.001`
+- `CPU.NZCV.CSEL.001`
+- `CPU.REG.PRESERVE.001`
+- `IPC.SM.GET_SERVICE.001`
+- `IPC.SVC21.REPEATED.001`
 
-- implementation/docs SHA: `564fc12b7389f672cb50f0137c01f4183b061784`
-- workflow run: `34676469257` — PASS
-- NRO artifact `10292192995` — `NCE-DIAG-nro`
-- raw artifact `10292208003` — `NCE-DIAG-raw-CPU-NZCV-CINC-001`
-- raw binary size guard: PASS (`<= 256` bytes)
-- compiled instruction sequence guard: PASS
-- raw ABI `_Static_assert` compile-check: PASS
+Runtime behavior implemented:
 
-Expected semantic for fixed input `w16=0`:
+1. start automatically;
+2. execute all five tests;
+3. print per-test PASS/FAIL and summary;
+4. print detailed state for failures;
+5. write JSON to `sdmc:/nce_diag_result.json`, with relative-path fallback;
+6. exit automatically after output flush.
 
-- `actual_result = 2`
-- `nzcv_before = 0x60000000`
-- `nzcv_after = 0x60000000`
+The CINC raw ARM64 microtest is embedded directly in the NRO and called by the harness. The standalone raw ELF/BIN remains auxiliary only.
 
-Runtime validation is still pending. Do not add `CPU.NZCV.CSEL.001` yet.
+## Validated build baseline
 
-Next runtime order:
+GitHub Actions run: `34676758424` — PASS.
 
-1. execute the current semantic in one known-good reference environment;
-2. execute it in Windows ARM64 Eden NCE;
-3. compare result/NZCV values;
-4. record the differential result;
-5. only then advance to the next semantic.
+Executable artifact ID: `10292253583` (`NCE-DIAG-0.1-executable`).
+
+Artifact ZIP digest: `sha256:ce3ca0999b176bb97f05e1d9162686b6147bf5023b8de495fb90ecab1c51051d`.
+
+Extracted `NCE-DIAG.nro` SHA-256:
+`ed16d5872ca1b3ddab3aebd9388db448fb2b0b054047a1ea0941007f66c026d7`.
+
+CI verified executable build, embedded test symbols, all five IDs, JSON output path, and auxiliary raw instruction shape.
+
+## Not yet claimed
+
+- Eden boot PASS
+- real Switch boot PASS
+- actual five-test runtime results
+- JSON file creation observed on target
+- normal target exit observed
+
+Therefore first milestone is build-complete but runtime-open. Do not declare NCE-DIAG 0.1 complete until target execution evidence is captured.
