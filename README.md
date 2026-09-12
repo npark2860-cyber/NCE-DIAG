@@ -1,8 +1,12 @@
 # NCE-DIAG
 
-Independent guest-side conformance and diagnostic workload for Windows ARM64 NCE validation.
+Independent internal guest-side conformance and diagnostic workload for Windows ARM64 NCE validation.
 
-The workload is intentionally separate from Eden/Strato implementation code and uses public devkitA64/libnx tooling. The first implementation is deliberately small: one harness and one deterministic CPU regression probe.
+NCE-DIAG is not a public homebrew product. Its purpose is to reduce large-game failures to small deterministic tests that exercise one CPU, SVC, IPC, exception, or memory semantic at a time and report expected/actual state.
+
+The project is intentionally separate from Eden/Strato production implementation code. Eden/Strato may be used as reference and comparison targets, but failures found here are not fixed in those repositories from this project.
+
+NCE-DIAG is not limited to libnx abstractions. Public devkitA64/libnx/switchbrew material remains useful for the first executable path, while authorized internal references such as user-provided firmware/title dumps, NSO/NPDM/ExeFS, ABI/API material, binaries, disassembly, logs, known-good runtime captures, and real-hardware results may also be used when needed.
 
 ## Current test
 
@@ -27,7 +31,9 @@ For `w16 = 0` the expected state is:
 
 The probe saves and restores the incoming architectural `x18` value before returning to the C harness.
 
-## Build
+## Current bootstrap build path
+
+The first executable path uses devkitA64/libnx because it is small and reproducible; this is a bootstrap choice, not a permanent API restriction.
 
 Requirements:
 
@@ -48,14 +54,4 @@ Expected artifact:
 NCE-DIAG.nro
 ```
 
-Clean:
-
-```sh
-make clean
-```
-
-## Run
-
-Place `NCE-DIAG.nro` under the normal Switch homebrew path and launch it through hbmenu or the equivalent homebrew loader in the target environment.
-
-The current stage prints the test result and detailed NZCV values on failure. Machine-readable file output is intentionally deferred until this first probe is build- and runtime-validated.
+Machine-readable output, IPC/SVC probes, exception probes, memory probes, and any lower-level packaging/runtime path are added incrementally after the current first probe is build- and runtime-validated.
