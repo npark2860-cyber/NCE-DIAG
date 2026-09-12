@@ -48,6 +48,9 @@ jobs:
               ! grep -Eiq "cntpct|cntvct" /tmp/nce_diag_main.disasm
               grep -q "nce_diag_set_run_id" /tmp/nce_diag_main.disasm
               grep -q "nce_diag_logf" /tmp/nce_diag_main.disasm
+              $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<nce_diag_pre_main_constructor_probe>:/,/^$/p" > /tmp/nce_diag_ctor.disasm
+              test "$(grep -Ec "[[:space:]]bl[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_ctor.disasm)" -eq 2
+              ! grep -Eq "[[:space:]]b[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_ctor.disasm
             '
           strings NCE-DIAG.nro | grep -q '0.2.1'
           strings NCE-DIAG.nro | grep -q '00_APP_INIT_ENTER'
