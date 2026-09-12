@@ -4,8 +4,9 @@ import re
 import sys
 from collections import Counter
 
-TEST_PREFIX = 0x4E43455400000000
-CKPT_PREFIX = 0x4E43454300000000
+LEGACY_TEST_PREFIX = 0x4E43455400000000
+LEGACY_CKPT_PREFIX = 0x4E43454300000000
+COMBINED_PREFIX = 0x4E43455700000000
 PREFIX_MASK = 0xFFFFFFFF00000000
 HASH_MASK = 0x00000000FFFFFFFF
 
@@ -18,25 +19,11 @@ TEST_IDS = [
 ]
 
 CHECKPOINT_IDS = [
-    "00_ENTER",
-    "90_RESULT_RETURNED",
-    "10_PRE_SEQUENCE",
-    "20_POST_SEQUENCE",
-    "30_RESULT_CAPTURED",
-    "05_SM_READY_CHECK",
-    "06_SM_NOT_READY",
-    "10_HANDLE_READY",
-    "15_PRE_REQUEST_BUILD",
-    "20_REQUEST_BUILT",
-    "30_PRE_SVC",
-    "40_POST_SVC",
-    "45_PRE_RESULT_PARSE",
-    "50_RESULT_PARSED",
-    "55_PRE_CLOSE",
-    "56_POST_CLOSE",
-    "60_DONE",
-    "60_ITER_DONE",
-    "70_LOOP_DONE",
+    "00_ENTER", "90_RESULT_RETURNED", "10_PRE_SEQUENCE", "20_POST_SEQUENCE",
+    "30_RESULT_CAPTURED", "05_SM_READY_CHECK", "06_SM_NOT_READY",
+    "10_HANDLE_READY", "15_PRE_REQUEST_BUILD", "20_REQUEST_BUILT",
+    "30_PRE_SVC", "40_POST_SVC", "45_PRE_RESULT_PARSE", "50_RESULT_PARSED",
+    "55_PRE_CLOSE", "56_POST_CLOSE", "60_DONE", "60_ITER_DONE", "70_LOOP_DONE",
 ]
 
 PRE_RE = re.compile(
@@ -64,14 +51,42 @@ def build_map(items):
     return result
 
 
+def build_combined_map():
+    result = {}
+    for test_id in TEST_IDS:
+        for checkpoint_id in CHECKPOINT_IDS:
+            key = fnv1a32(f"{test_id} {checkpoint_id}")
+            value = (test_id, checkpoint_id)
+            if key in result and result[key] != value:
+                raise RuntimeError(f"combined FNV collision: {result[key]} vs {value}")
+            result[key] = value
+    return result
+
+
 TEST_MAP = build_map(TEST_IDS)
 CKPT_MAP = build_map(CHECKPOINT_IDS)
+COMBINED_MAP = build_combined_map()
 
 
-def decode_tag(value: int, prefix: int, mapping):
-    if value & PREFIX_MASK != prefix:
+def decode_legacy(x19, x20):
+    if x19 & PREFIX_MASK != LEGACY_TEST_PREFIX:
         return None
-    return mapping.get(value & HASH_MASK, f"UNKNOWN_HASH_{value & HASH_MASK:08X}")
+    if x20 & PREFIX_MASK != LEGACY_CKPT_PREFIX:
+        return None
+    test_id = TEST_MAP.get(x19 & HASH_MASK)
+    checkpoint_id = CKPT_MAP.get(x20 & HASH_MASK)
+    if not test_id or not checkpoint_id:
+        return None
+    return test_id, checkpoint_id, "legacy-x19-x20"
+
+
+def decode_combined(x19):
+    if x19 & PREFIX_MASK != COMBINED_PREFIX:
+        return None
+    pair = COMBINED_MAP.get(x19 & HASH_MASK)
+    if not pair:
+        return None
+    return pair[0], pair[1], "combined-x19"
 
 
 def decode_lines(lines):
@@ -79,53 +94,56 @@ def decode_lines(lines):
     decoded = []
     for line in lines:
         match = PRE_RE.search(line)
-        if not match:
+        if not match or int(match.group("svc"), 16) != 0x27:
             continue
-        if int(match.group("svc"), 16) != 0x27:
-            continue
-
         x19 = int(match.group("x19"), 16)
         x20 = int(match.group("x20"), 16)
-        test_id = decode_tag(x19, TEST_PREFIX, TEST_MAP)
-        checkpoint_id = decode_tag(x20, CKPT_PREFIX, CKPT_MAP)
-        if test_id is None or checkpoint_id is None:
+        item = decode_combined(x19) or decode_legacy(x19, x20)
+        if not item:
             continue
-
+        test_id, checkpoint_id, mode = item
         key = (test_id, checkpoint_id)
         occurrences[key] += 1
-        decoded.append(
-            {
-                "n": int(match.group("n")),
-                "test": test_id,
-                "checkpoint": checkpoint_id,
-                "occurrence": occurrences[key],
-                "x19": x19,
-                "x20": x20,
-            }
-        )
+        decoded.append({
+            "n": int(match.group("n")),
+            "test": test_id,
+            "checkpoint": checkpoint_id,
+            "occurrence": occurrences[key],
+            "mode": mode,
+            "x19": x19,
+            "x20": x20,
+        })
     return decoded
 
 
 def self_test():
-    test_tag = TEST_PREFIX | fnv1a32("CPU.NZCV.CINC.001")
-    checkpoint_tag = CKPT_PREFIX | fnv1a32("20_POST_SEQUENCE")
+    test_id = "CPU.NZCV.CINC.001"
+    checkpoint_id = "20_POST_SEQUENCE"
+    combined = COMBINED_PREFIX | fnv1a32(f"{test_id} {checkpoint_id}")
     sample = (
         "Core.ARM <Error> RunThread: IMP008_REENTRY_STATE_PRE n=30 path=post "
-        f"pc=0 svc=00000027 x19={test_tag:016X} x20={checkpoint_tag:016X} "
-        "x29=0 x30=0"
+        f"pc=0 svc=00000027 x19={combined:016X} x20=0000001234567890 x29=0 x30=0"
     )
     decoded = decode_lines([sample])
     assert len(decoded) == 1
-    assert decoded[0]["test"] == "CPU.NZCV.CINC.001"
-    assert decoded[0]["checkpoint"] == "20_POST_SEQUENCE"
-    assert decoded[0]["occurrence"] == 1
+    assert decoded[0]["test"] == test_id
+    assert decoded[0]["checkpoint"] == checkpoint_id
+    assert decoded[0]["mode"] == "combined-x19"
+
+    legacy_test = LEGACY_TEST_PREFIX | fnv1a32(test_id)
+    legacy_ckpt = LEGACY_CKPT_PREFIX | fnv1a32(checkpoint_id)
+    sample2 = (
+        "Core.ARM <Error> RunThread: IMP008_REENTRY_STATE_PRE n=31 path=post "
+        f"pc=0 svc=00000027 x19={legacy_test:016X} x20={legacy_ckpt:016X} x29=0 x30=0"
+    )
+    decoded2 = decode_lines([sample2])
+    assert len(decoded2) == 1
+    assert decoded2[0]["mode"] == "legacy-x19-x20"
     print("checkpoint decoder self-test: PASS")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Decode NCE-DIAG x19/x20 checkpoint witnesses from an Eden log"
-    )
+    parser = argparse.ArgumentParser(description="Decode NCE-DIAG checkpoint witnesses from an Eden log")
     parser.add_argument("log", nargs="?", help="Eden log file")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
@@ -146,7 +164,7 @@ def main():
     for item in decoded:
         print(
             f"n={item['n']} test={item['test']} checkpoint={item['checkpoint']} "
-            f"occurrence={item['occurrence']} "
+            f"occurrence={item['occurrence']} mode={item['mode']} "
             f"x19={item['x19']:016X} x20={item['x20']:016X}"
         )
 
@@ -154,7 +172,7 @@ def main():
     print(
         "LAST "
         f"test={last['test']} checkpoint={last['checkpoint']} "
-        f"occurrence={last['occurrence']} n={last['n']}"
+        f"occurrence={last['occurrence']} n={last['n']} mode={last['mode']}"
     )
     return 0
 
