@@ -5,6 +5,7 @@
 #include <switch.h>
 
 #include "nce_diag.h"
+#include "nce_diag_raw_abi.h"
 
 #define NCE_DIAG_VERSION "0.1.0"
 
