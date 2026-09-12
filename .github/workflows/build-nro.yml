@@ -16,20 +16,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build NRO with devkitA64/libnx
+      - name: Build NRO and raw microtest with devkitA64
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work \
             devkitpro/devkita64:20260219 \
-            make
+            bash -lc 'make && make -C microtests'
 
-      - name: Verify artifact
-        run: test -s NCE-DIAG.nro
+      - name: Verify artifacts and raw instruction shape
+        run: |
+          test -s NCE-DIAG.nro
+          test -s microtests/build/cpu_nzcv_cinc_001.elf
+          test -s microtests/build/cpu_nzcv_cinc_001.bin
+          test "$(stat -c%s microtests/build/cpu_nzcv_cinc_001.bin)" -le 256
+          python3 scripts/verify_raw_sequence.py microtests/build/cpu_nzcv_cinc_001.disasm.txt
 
       - name: Upload NRO
         uses: actions/upload-artifact@v4
         with:
           name: NCE-DIAG-nro
           path: NCE-DIAG.nro
+          if-no-files-found: error
+
+      - name: Upload raw microtest
+        uses: actions/upload-artifact@v4
+        with:
+          name: NCE-DIAG-raw-CPU-NZCV-CINC-001
+          path: |
+            microtests/build/cpu_nzcv_cinc_001.elf
+            microtests/build/cpu_nzcv_cinc_001.bin
+            microtests/build/cpu_nzcv_cinc_001.disasm.txt
           if-no-files-found: error

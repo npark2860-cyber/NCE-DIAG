@@ -27,7 +27,7 @@ Validated before raw split:
 
 Pending after raw split:
 
-- new CI run for commit `07562c3e0603eb51568eb584f84b7ae8fd5da054`
+- CI validation of the raw/NRO pair
 - runtime execution on a known-good reference
 - runtime execution on Windows ARM64 Eden NCE
 - JSON/result-file layer
