@@ -36,7 +36,7 @@ jobs:
             -w /work \
             devkitpro/devkita64:20260219 \
             bash -lc '
-              set -euo pipefail
+              set -eu
               NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm
               OBJDUMP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objdump
               $NM NCE-DIAG.elf | grep -Eq " T __appInit$"
