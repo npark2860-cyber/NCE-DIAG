@@ -54,7 +54,7 @@ endif
 
 export OFILES_BIN := $(addsuffix .o,$(BINFILES))
 export OFILES_SRC := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES     := $(OFILES_BIN) $(OFILES_SRC) $(SFILES:.s=.o)
+export OFILES     := $(OFILES_BIN) $(OFILES_SRC)
 export HFILES_BIN := $(addsuffix .h,$(subst .,_,$(BINFILES)))
 
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
