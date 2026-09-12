@@ -109,7 +109,7 @@ endif
 $(OUTPUT).elf: $(OFILES)
 $(OFILES_SRC): $(HFILES_BIN)
 
-harness.o: CFLAGS += -Dnce_diag_output_debug_string=nce_diag_output_debug_string_safe
+harness.o: CFLAGS += -Dnce_diag_output_debug_string=nce_diag_output_debug_string_x19safe
 
 %.bin.o %_bin.h: %.bin
 	@echo $(notdir $<)
