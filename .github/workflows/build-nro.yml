@@ -32,7 +32,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work \
             devkitpro/devkita64:20260219 \
-            bash -lc 'aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001 && aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_nzcv_csel_probe && aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_reg_preserve_probe'
+            bash -lc '/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001 && /opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_nzcv_csel_probe && /opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_reg_preserve_probe'
           strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CINC.001'
           strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CSEL.001'
           strings NCE-DIAG.nro | grep -q 'CPU.REG.PRESERVE.001'
