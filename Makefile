@@ -29,7 +29,7 @@ CFLAGS   += -DNCE_DIAG_DEFAULT_FIRST=$(NCE_DIAG_DEFAULT_FIRST)
 CFLAGS   += -DNCE_DIAG_DEFAULT_LAST=$(NCE_DIAG_DEFAULT_LAST)
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS  := -g $(ARCH)
-LDFLAGS  := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--wrap=main -Wl,--wrap=nce_diag_set_run_id
+LDFLAGS  := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--wrap=main -Wl,--wrap=nce_diag_set_run_id -Wl,--wrap=vsnprintf
 LIBS     := -lnx
 LIBDIRS  := $(PORTLIBS) $(LIBNX)
 
@@ -54,7 +54,7 @@ endif
 
 export OFILES_BIN := $(addsuffix .o,$(BINFILES))
 export OFILES_SRC := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES     := $(OFILES_BIN) $(OFILES_SRC)
+export OFILES     := $(OFILES_BIN) $(OFILES_SRC) $(SFILES:.s=.o)
 export HFILES_BIN := $(addsuffix .h,$(subst .,_,$(BINFILES)))
 
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
