@@ -2,35 +2,41 @@
 
 Branch: `feat/nce-diag-0.1-minimal`
 
-Project role: private/internal guest-side conformance and diagnostic bench for Windows ARM64 NCE. It is not constrained to public homebrew APIs. Authorized internal references may be used when needed, while Eden/Strato production code remains read-only from this project.
+Project role: private/internal guest-side conformance and diagnostic bench for Windows ARM64 NCE. Eden/Strato production code remains read-only from this project.
 
-Current stage: minimal harness plus `CPU.NZCV.CINC.001`, now split into two layers:
+Current scope remains exactly one semantic: `CPU.NZCV.CINC.001`.
 
-- NRO/bootstrap harness path
-- standalone raw ARM64 microtest artifact
+Implemented layers:
 
-Implemented:
+- standalone raw ARM64 microtest
+- devkitA64/libnx NRO bootstrap runner
+- shared assembly macro for the measured core
+- fixed raw result ABI with compile-time offset/size assertions
+- compiled instruction-order verification
+- CI artifact production for both raw and NRO forms
 
-- devkitA64/libnx NRO bootstrap Makefile structure
-- common `TestResult` harness shape
-- shared AArch64 semantic macro for the exact `cmp / mrs / stp w17,w18,+0x0c / mrs / mov / cinc` core
-- raw result ABI (`NceDiagCpuNzcvCincRawResult`)
-- standalone raw ELF/BIN microtest build
-- human-readable PASS/FAIL summary and detailed failure state
-- GitHub Actions build validation for both NRO and raw microtest
-- compiled raw instruction-order verification
+Validated build baseline:
 
-Validated before raw split:
+- implementation/docs SHA: `564fc12b7389f672cb50f0137c01f4183b061784`
+- workflow run: `34676469257` — PASS
+- NRO artifact `10292192995` — `NCE-DIAG-nro`
+- raw artifact `10292208003` — `NCE-DIAG-raw-CPU-NZCV-CINC-001`
+- raw binary size guard: PASS (`<= 256` bytes)
+- compiled instruction sequence guard: PASS
+- raw ABI `_Static_assert` compile-check: PASS
 
-- NRO CI run `34676110063`: PASS
-- artifact `10292806427`: `NCE-DIAG-nro`
+Expected semantic for fixed input `w16=0`:
 
-Pending after raw split:
+- `actual_result = 2`
+- `nzcv_before = 0x60000000`
+- `nzcv_after = 0x60000000`
 
-- CI validation of the raw/NRO pair
-- runtime execution on a known-good reference
-- runtime execution on Windows ARM64 Eden NCE
-- JSON/result-file layer
-- any test beyond `CPU.NZCV.CINC.001`
+Runtime validation is still pending. Do not add `CPU.NZCV.CSEL.001` yet.
 
-Do not add the next semantic until the current raw/NRO pair is built and runtime-validated.
+Next runtime order:
+
+1. execute the current semantic in one known-good reference environment;
+2. execute it in Windows ARM64 Eden NCE;
+3. compare result/NZCV values;
+4. record the differential result;
+5. only then advance to the next semantic.
