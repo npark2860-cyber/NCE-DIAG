@@ -29,7 +29,7 @@ CFLAGS   += -DNCE_DIAG_DEFAULT_FIRST=$(NCE_DIAG_DEFAULT_FIRST)
 CFLAGS   += -DNCE_DIAG_DEFAULT_LAST=$(NCE_DIAG_DEFAULT_LAST)
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS  := -g $(ARCH)
-LDFLAGS  := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS  := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--wrap=main
 LIBS     := -lnx
 LIBDIRS  := $(PORTLIBS) $(LIBNX)
 
