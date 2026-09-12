@@ -13,6 +13,24 @@ extern uint32_t nce_diag_emit_debug_witness(
     uint64_t test_tag,
     uint64_t checkpoint_tag);
 
+__asm__(
+    ".text\n"
+    ".balign 4\n"
+    ".global nce_diag_emit_debug_witness\n"
+    ".type nce_diag_emit_debug_witness, %function\n"
+    "nce_diag_emit_debug_witness:\n"
+    "    stp x19, x20, [sp, #-0x20]!\n"
+    "    str x30, [sp, #0x10]\n"
+    "    cbz x2, 1f\n"
+    "    mov x19, x2\n"
+    "    mov x20, x3\n"
+    "1:\n"
+    "    bl svcOutputDebugString\n"
+    "    ldr x30, [sp, #0x10]\n"
+    "    ldp x19, x20, [sp], #0x20\n"
+    "    ret\n"
+    ".size nce_diag_emit_debug_witness, .-nce_diag_emit_debug_witness\n");
+
 static uint32_t fnv1a32_range(const char *begin, const char *end) {
     uint32_t hash = UINT32_C(2166136261);
     for (const char *p = begin; p < end; ++p) {
