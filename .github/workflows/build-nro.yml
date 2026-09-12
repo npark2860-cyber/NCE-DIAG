@@ -16,40 +16,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build executable NRO and auxiliary raw microtest
+      - name: Build default and CINC-only executable NROs
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work \
             devkitpro/devkita64:20260219 \
-            bash -lc 'make && make -C microtests'
+            bash -lc 'make && make TARGET=NCE-DIAG-CINC BUILD=build-cinc NCE_DIAG_DEFAULT_FIRST=1 NCE_DIAG_DEFAULT_LAST=1 && make -C microtests'
 
-      - name: Verify crash-observable executable milestone shape
+      - name: Verify minimal startup and crash-observable executable shape
         run: |
           test -s NCE-DIAG.nro
           test -s NCE-DIAG.elf
+          test -s NCE-DIAG-CINC.nro
+          test -s NCE-DIAG-CINC.elf
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work \
             devkitpro/devkita64:20260219 \
             bash -lc '
               NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm
+              $NM NCE-DIAG.elf | grep -Eq " T __appInit$"
+              $NM NCE-DIAG.elf | grep -Eq " T __appExit$"
+              $NM NCE-DIAG.elf | grep -q nce_diag_filesystem_enable
               $NM NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001
-              $NM NCE-DIAG.elf | grep -q nce_diag_cpu_nzcv_csel_probe
-              $NM NCE-DIAG.elf | grep -q nce_diag_cpu_reg_preserve_probe
               $NM NCE-DIAG.elf | grep -q nce_diag_checkpoint
               $NM NCE-DIAG.elf | grep -q svcOutputDebugString
               ! $NM NCE-DIAG.elf | grep -q " consoleInit$"
             '
-          strings NCE-DIAG.nro | grep -q '0.2.0'
-          strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CINC.001'
-          strings NCE-DIAG.nro | grep -q 'IPC.SVC21.REPEATED.001'
+          strings NCE-DIAG.nro | grep -q '0.2.1'
+          strings NCE-DIAG.nro | grep -q '00_APP_INIT_ENTER'
+          strings NCE-DIAG.nro | grep -q '10_PRE_SM_INIT'
+          strings NCE-DIAG.nro | grep -q '30_APP_INIT_DONE'
           strings NCE-DIAG.nro | grep -q '10_PRE_SEQUENCE'
           strings NCE-DIAG.nro | grep -q '30_PRE_SVC'
           strings NCE-DIAG.nro | grep -q '40_POST_SVC'
-          strings NCE-DIAG.nro | grep -q 'nce_diag.cfg'
-          strings NCE-DIAG.nro | grep -q 'nce_diag_result.json'
-          strings NCE-DIAG.nro | grep -q 'nce_diag_journal.log'
+          strings NCE-DIAG.nro | grep -q 'OPTIONAL_FS 30_PRE_SD_MOUNT'
+          strings NCE-DIAG.nro | grep -q 'RESULT_FILE SKIPPED mode=debug-only'
 
       - name: Verify auxiliary raw instruction shape
         run: |
@@ -58,20 +61,24 @@ jobs:
           test "$(stat -c%s microtests/build/cpu_nzcv_cinc_001.bin)" -le 256
           python3 scripts/verify_raw_sequence.py microtests/build/cpu_nzcv_cinc_001.disasm.txt
 
-      - name: Upload executable NRO
+      - name: Upload executable NROs
         uses: actions/upload-artifact@v4
         with:
-          name: NCE-DIAG-0.2-crash-observable
-          path: NCE-DIAG.nro
+          name: NCE-DIAG-0.2.1-executables
+          path: |
+            NCE-DIAG.nro
+            NCE-DIAG-CINC.nro
           if-no-files-found: error
 
       - name: Upload guest debug symbols
         uses: actions/upload-artifact@v4
         with:
-          name: NCE-DIAG-0.2-debug-symbols
+          name: NCE-DIAG-0.2.1-debug-symbols
           path: |
             NCE-DIAG.elf
+            NCE-DIAG-CINC.elf
             build/*.map
+            build-cinc/*.map
           if-no-files-found: error
 
       - name: Upload auxiliary raw microtest

@@ -36,6 +36,10 @@ void nce_diag_checkpointf(const char *test_id, const char *checkpoint_id, const 
 bool nce_diag_persistence_enable(void);
 void nce_diag_persistence_disable(void);
 
+bool nce_diag_sm_ready(void);
+bool nce_diag_filesystem_enable(void);
+void nce_diag_filesystem_disable(void);
+
 uint32_t nce_diag_cpu_nzcv_csel_probe(uint64_t *nzcv_before, uint64_t *nzcv_after);
 uint32_t nce_diag_cpu_reg_preserve_probe(void);
 

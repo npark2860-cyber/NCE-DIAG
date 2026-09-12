@@ -9,19 +9,24 @@ endif
 TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/libnx/switch_rules
 
-TARGET      := NCE-DIAG
-BUILD       := build
+TARGET      ?= NCE-DIAG
+BUILD       ?= build
 SOURCES     := source
 DATA        := data
 INCLUDES    := include
 
 APP_TITLE   := NCE-DIAG
 APP_AUTHOR  := NCE-DIAG
-APP_VERSION := 0.1.0
+APP_VERSION := 0.2.1
+
+NCE_DIAG_DEFAULT_FIRST ?= 1
+NCE_DIAG_DEFAULT_LAST  ?= 5
 
 ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS   := -g -Wall -Wextra -O2 -ffunction-sections $(ARCH) $(DEFINES)
 CFLAGS   += $(INCLUDE) -D__SWITCH__ -std=gnu11
+CFLAGS   += -DNCE_DIAG_DEFAULT_FIRST=$(NCE_DIAG_DEFAULT_FIRST)
+CFLAGS   += -DNCE_DIAG_DEFAULT_LAST=$(NCE_DIAG_DEFAULT_LAST)
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS  := -g $(ARCH)
 LDFLAGS  := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
@@ -86,7 +91,7 @@ $(BUILD):
 
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).nro $(TARGET).nacp $(TARGET).elf
+	@rm -fr build build-cinc $(TARGET).nro $(TARGET).nacp $(TARGET).elf NCE-DIAG*.nro NCE-DIAG*.nacp NCE-DIAG*.elf
 
 else
 

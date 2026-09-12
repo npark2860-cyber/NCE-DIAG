@@ -6,14 +6,20 @@
 
 #include "nce_diag.h"
 
+#define NCE_DIAG_RC_SM_NOT_READY UINT32_C(0xFFF00001)
+
 static Result sm_get_service_checkpointed(
     const char *test_id,
     uint32_t iteration,
     bool include_iteration,
     Handle *out_handle) {
+    if (!nce_diag_sm_ready()) {
+        return NCE_DIAG_RC_SM_NOT_READY;
+    }
+
     Service *sm_session = smGetServiceSession();
     if (!serviceIsActive(sm_session)) {
-        return UINT32_C(0xFFFFFFFF);
+        return NCE_DIAG_RC_SM_NOT_READY;
     }
 
     if (include_iteration) {
@@ -119,8 +125,27 @@ static Result close_handle_checkpointed(
     return rc;
 }
 
+static TestResult sm_not_ready_result(const char *id, uint64_t expected, const char *detail) {
+    nce_diag_checkpoint(id, "06_SM_NOT_READY");
+    return (TestResult){
+        .id = id,
+        .status = TEST_FAIL,
+        .expected = expected,
+        .actual = 0,
+        .nzcv_before = 0,
+        .nzcv_after = 0,
+        .result_code = NCE_DIAG_RC_SM_NOT_READY,
+        .detail = detail,
+    };
+}
+
 TestResult run_ipc_sm_get_service_001(void) {
     static const char *const id = "IPC.SM.GET_SERVICE.001";
+    nce_diag_checkpoint(id, "05_SM_READY_CHECK");
+    if (!nce_diag_sm_ready()) {
+        return sm_not_ready_result(id, 1, "minimal runtime SM initialization failed");
+    }
+
     Handle handle = INVALID_HANDLE;
     Result final_rc = sm_get_service_checkpointed(id, 0, false, &handle);
     bool pass = R_SUCCEEDED(final_rc) && handle != INVALID_HANDLE;
@@ -150,6 +175,11 @@ TestResult run_ipc_sm_get_service_001(void) {
 TestResult run_ipc_svc21_repeated_001(void) {
     static const char *const id = "IPC.SVC21.REPEATED.001";
     enum { ITERATIONS = 16 };
+    nce_diag_checkpoint(id, "05_SM_READY_CHECK");
+    if (!nce_diag_sm_ready()) {
+        return sm_not_ready_result(id, ITERATIONS, "minimal runtime SM initialization failed");
+    }
+
     uint32_t completed = 0;
     Result first_error = 0;
 
