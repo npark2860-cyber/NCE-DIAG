@@ -9,6 +9,7 @@
 .balign 4
 .global __wrap__svfprintf_r
 .type __wrap__svfprintf_r, %function
+.extern g_svfprintf_probe_active
 __wrap__svfprintf_r:
     sub sp, sp, #0x40
     stp x0, x1, [sp, #0x00]
@@ -20,10 +21,19 @@ __wrap__svfprintf_r:
     mov x1, #36
     bl svcOutputDebugString
 
+    adrp x9, g_svfprintf_probe_active
+    add x9, x9, :lo12:g_svfprintf_probe_active
+    mov w10, #1
+    str w10, [x9]
+
     ldp x0, x1, [sp, #0x00]
     ldp x2, x3, [sp, #0x10]
     bl __real__svfprintf_r
     str x0, [sp, #0x28]
+
+    adrp x9, g_svfprintf_probe_active
+    add x9, x9, :lo12:g_svfprintf_probe_active
+    str wzr, [x9]
 
     adrp x0, .Lsvfprintf_return_marker
     add x0, x0, :lo12:.Lsvfprintf_return_marker
