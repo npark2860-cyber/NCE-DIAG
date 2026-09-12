@@ -4,27 +4,34 @@ Branch: `feat/nce-diag-0.2-crash-observability`
 
 Role: independent internal guest-side NCE diagnostic executable. Eden/Strato production implementation remains read-only from this project.
 
-0.2 scope: crash observability only; no new testcase IDs added.
+Current version: `0.2.1`.
 
-Implemented:
+## Runtime evidence that changed the design
 
-- direct `svcOutputDebugString` primary logging
-- run ID on every diagnostic line
-- startup markers
-- testcase `BEGIN`, internal stable `CKPT`, immediate `PASS`/`FAIL`, `END`
-- CPU raw-sequence checkpoints outside architectural-state-sensitive assembly
-- explicit IPC request-build / PRE_SVC / POST_SVC / parse boundaries
-- repeated IPC iteration number in checkpoint output
-- optional flushed lifecycle journal; internal CKPT remains filesystem-free
-- suite, single-test, and 1-based range selection
-- GUI console initialization removed
-- normal-completion JSON result retained
+The previous 0.2 executable loaded in Eden and entered Windows ARM64 NCE, but no `[NCE-DIAG]` marker reached the Eden log before the host process terminated.
 
-Build validation at source commit `86d7eef1577a568a92e9c63606b3beb865adc94a` passed executable-shape and auxiliary raw-shape checks in workflow run `34677885223` before this documentation-only commit.
+The final observed guest PCs were symbolized against the matching NCE-DIAG ELF:
 
-Runtime status:
+- `+0x9308`: `cmifMakeRequest`
+- `+0x9334`: `hipcParseResponse`
+- `+0x93AC`: `_fsCmdGetSession`
+- earlier `+0x93E0`: `serviceCreateDomainSubservice`
 
-- previous 0.1 NRO: Eden load/boot and guest execution observed, then host process crash
-- 0.2 crash-observable NRO: build validated; Eden runtime checkpoint capture pending
+This is before `main()`. libnx 4.12 default `__appInit` initializes FS and mounts SDMC before main, so the diagnostic harness could not emit its first normal marker.
 
-Do not add new tests until the 0.2 NRO is run in Eden and the last guest-side checkpoint is captured.
+## 0.2.1 implementation
+
+- strong project-owned `__appInit` / `__appExit`
+- direct `[NCE-DIAG][BOOT]` markers from `__appInit`
+- startup initializes SM only
+- no default applet/HID/time/FS/SDMC/console path before main
+- FS is lazy and opt-in for config/persistence only
+- FS lazy-init has `PRE_FS_INIT`, `POST_FS_INIT`, `PRE_SD_MOUNT`, `POST_SD_MOUNT` markers
+- default debug-only run performs no file I/O
+- full-suite NRO plus CINC-only NRO from the same source
+- stable testcase IDs unchanged
+- ELF/map retained in CI for future guest-PC symbolization
+
+Build validation: workflow run `34678637086` PASS at source commit `2f52e25135860e6fe25b9d027128dd2f4696810e`.
+
+Runtime status: 0.2.1 Eden retry pending. Do not add new testcase IDs before this retry.

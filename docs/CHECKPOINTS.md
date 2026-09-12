@@ -1,8 +1,25 @@
 # Crash-resilient checkpoint format
 
-NCE-DIAG 0.2 treats the emulator process itself as a possible failure boundary.
+NCE-DIAG 0.2.1 treats the emulator process itself as a possible failure boundary.
 
-Primary output is a direct `svcOutputDebugString` call (SVC 0x27). Checkpoints are emitted before dangerous guest operations and again after they return.
+Primary output is direct `svcOutputDebugString` (SVC 0x27).
+
+## Pre-main boot markers
+
+The custom minimal `__appInit` emits markers before normal harness code exists:
+
+```text
+[NCE-DIAG][BOOT] 00_APP_INIT_ENTER
+[NCE-DIAG][BOOT] 10_PRE_SM_INIT
+[NCE-DIAG][BOOT] 20_POST_SM_INIT
+[NCE-DIAG][BOOT] 30_APP_INIT_DONE
+```
+
+If SM initialization fails, `21_SM_INIT_FAILED` replaces `20_POST_SM_INIT`.
+
+These markers have no run ID because they execute before `main()` chooses one.
+
+## Test markers
 
 Format:
 
@@ -15,18 +32,18 @@ Format:
 [NCE-DIAG][RUN=123456] END CPU.NZCV.CINC.001
 ```
 
-Internal checkpoint logging is debug-output only. It never performs filesystem persistence. This prevents persistent-mode file IPC from overwriting the TLS IPC request buffer between `REQUEST_BUILT` and `svcSendSyncRequest`.
-
-Persistent mode journals safe lifecycle records (`BEGIN`, `PASS`/`FAIL`, `END`) and flushes each record. It is optional and disabled by default.
+Internal CKPT logging is debug-output only. It never performs filesystem persistence.
 
 ## Normal PASS sample
 
 ```text
-[NCE-DIAG][RUN=123456] START version=0.2.0
+[NCE-DIAG][BOOT] 00_APP_INIT_ENTER
+[NCE-DIAG][BOOT] 10_PRE_SM_INIT
+[NCE-DIAG][BOOT] 20_POST_SM_INIT
+[NCE-DIAG][BOOT] 30_APP_INIT_DONE
+[NCE-DIAG][RUN=123456] START version=0.2.1
 [NCE-DIAG][RUN=123456] STARTUP 00_MAIN_ENTER
-[NCE-DIAG][RUN=123456] STARTUP 10_RUNTIME_READY
-[NCE-DIAG][RUN=123456] STARTUP 20_HARNESS_INIT
-[NCE-DIAG][RUN=123456] TEST_SELECTION mode=single first=1 last=1 persist=0
+[NCE-DIAG][RUN=123456] TEST_SELECTION mode=range first=1 last=1 persist=0 source=compile-default
 [NCE-DIAG][RUN=123456] BEGIN CPU.NZCV.CINC.001
 [NCE-DIAG][RUN=123456] CKPT CPU.NZCV.CINC.001 00_ENTER
 [NCE-DIAG][RUN=123456] CKPT CPU.NZCV.CINC.001 10_PRE_SEQUENCE
@@ -45,7 +62,7 @@ Persistent mode journals safe lifecycle records (`BEGIN`, `PASS`/`FAIL`, `END`) 
 [NCE-DIAG][RUN=123456] END CPU.NZCV.CINC.001
 ```
 
-## Expected crash-boundary sample
+## Host crash sample
 
 ```text
 [NCE-DIAG][RUN=123456] BEGIN IPC.SVC21.REPEATED.001
@@ -53,12 +70,24 @@ Persistent mode journals safe lifecycle records (`BEGIN`, `PASS`/`FAIL`, `END`) 
 [NCE-DIAG][RUN=123456] CKPT IPC.SVC21.REPEATED.001 30_PRE_SVC iter=07
 ```
 
-If the Eden host process disappears here, classify the boundary as:
+If the host disappears here:
 
 ```text
 HOST_PROCESS_CRASH_AFTER_30_PRE_SVC
-IPC.SVC21.REPEATED.001 iter=07
 boundary: 30_PRE_SVC -> 40_POST_SVC
 ```
 
-Do not record this as a guest test FAIL; the guest never returned from the operation.
+Do not classify a host exit as guest TEST_FAIL.
+
+## Optional FS markers
+
+Config/persistence explicitly enters a separately observable path:
+
+```text
+OPTIONAL_FS 10_PRE_FS_INIT
+OPTIONAL_FS 20_POST_FS_INIT
+OPTIONAL_FS 30_PRE_SD_MOUNT
+OPTIONAL_FS 40_POST_SD_MOUNT
+```
+
+Default debug-only execution does not enter this path.

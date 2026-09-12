@@ -2,9 +2,14 @@
 
 Do not add new testcase IDs.
 
-1. Download the latest `NCE-DIAG-0.2-crash-observable` artifact.
-2. First run only `CPU.NZCV.CINC.001` using `--test=CPU.NZCV.CINC.001` or `nce_diag.cfg`.
-3. Capture Eden log lines beginning with `[NCE-DIAG]`.
-4. If Eden exits, classify the last CKPT and the next expected CKPT as the host-crash boundary.
-5. If the single CPU test completes, run the full suite.
-6. Only after runtime evidence is recorded may the 0.2 harness milestone be marked PASS or the next semantic be added.
+1. Run `NCE-DIAG-CINC.nro` first in the same Windows ARM64 Eden build.
+2. Capture the Eden log from boot until exit/crash.
+3. Expected earliest markers are:
+   - `[NCE-DIAG][BOOT] 00_APP_INIT_ENTER`
+   - `[NCE-DIAG][BOOT] 10_PRE_SM_INIT`
+   - `[NCE-DIAG][BOOT] 20_POST_SM_INIT`
+   - `[NCE-DIAG][BOOT] 30_APP_INIT_DONE`
+   - `[NCE-DIAG][RUN=...] START version=0.2.1`
+4. If CINC-only reaches PASS/END, run `NCE-DIAG.nro` full suite.
+5. If Eden terminates before a normal marker, symbolize the last NCE guest PC against the retained `NCE-DIAG-0.2.1-debug-symbols` artifact.
+6. Do not enable `--config` or `--persist` during the first retry; both intentionally enter the optional FS path.

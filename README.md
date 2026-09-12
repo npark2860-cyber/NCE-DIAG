@@ -2,11 +2,34 @@
 
 Independent internal guest-side conformance and diagnostic workload for Windows ARM64 NCE validation.
 
-## 0.2 crash-observability milestone
+## 0.2.1 crash-observability runtime
 
 Primary artifact: `NCE-DIAG.nro`.
 
-The 0.2 harness is designed for the case where the Eden host process itself may terminate during a guest test. The primary diagnostic channel is a direct `svcOutputDebugString` call (SVC 0x27), not GUI rendering and not the final JSON file.
+A second executable, `NCE-DIAG-CINC.nro`, runs registry index 1 only (`CPU.NZCV.CINC.001`) and is intended for the first isolated Eden retry.
+
+The primary diagnostic channel is direct `svcOutputDebugString` (SVC 0x27). GUI rendering is not required.
+
+### Minimal startup
+
+The project overrides libnx's weak `__appInit` / `__appExit`.
+
+Default startup is now:
+
+```text
+libnx core runtime
+-> [BOOT] marker
+-> SM initialize only
+-> [BOOT] marker
+-> main
+-> test harness
+```
+
+Default startup does not initialize applet, HID, time, FS, SDMC, or a console framebuffer.
+
+This change was made after the previous 0.2 runtime log was symbolized to `_fsCmdGetSession` before `main()`, consistent with libnx default SD-card filesystem startup.
+
+### Test lifecycle
 
 Every testcase follows:
 
@@ -18,11 +41,9 @@ PASS / FAIL
 END
 ```
 
-If the host disappears after a PRE checkpoint and before the matching POST checkpoint, the last Eden guest-debug line defines the crash boundary.
+CPU architectural-state-sensitive sequences are not interrupted by logging calls.
 
-No GPU console, HID polling loop, audio, network, or presentation path is required by the harness.
-
-## Included stable tests
+## Stable tests
 
 1. `CPU.NZCV.CINC.001`
 2. `CPU.NZCV.CSEL.001`
@@ -30,13 +51,15 @@ No GPU console, HID polling loop, audio, network, or presentation path is requir
 4. `IPC.SM.GET_SERVICE.001`
 5. `IPC.SVC21.REPEATED.001`
 
-No new testcase was added for 0.2; this milestone changes observability and execution control only.
+No new testcase ID was added for 0.2.1.
 
 ## Selection
 
-Default: run the full suite.
+Default `NCE-DIAG.nro`: registry indices 1-5.
 
-Command-line forms:
+CINC-only executable: `NCE-DIAG-CINC.nro`.
+
+Runtime arguments remain available:
 
 ```text
 --all
@@ -44,46 +67,44 @@ Command-line forms:
 --range=1-3
 --persist
 --debug-only
---no-config
+--config
 ```
 
-If no explicit test/range argument is supplied, the harness looks for `sdmc:/nce_diag.cfg`, then `nce_diag.cfg`.
+Filesystem config is deliberately opt-in. `nce_diag.cfg` is not read during default startup.
 
-Config examples:
+## Persistence
 
-```text
-run=all
-persist=0
-```
+Default mode is debug-only: no filesystem is initialized and no JSON is written.
 
-```text
-test=CPU.NZCV.CINC.001
-persist=0
-```
+`--persist` or explicit config mode lazily enables FS/SDMC after the initial guest debug markers. FS startup itself has PRE/POST markers so an emulator crash there is observable.
 
-```text
-range=4-5
-persist=1
-```
+Persistent mode can write:
 
-Persistent mode appends safe lifecycle markers to `sdmc:/nce_diag_journal.log` (fallback: local path) and flushes each record. Internal CKPT markers remain debug-output only so file IPC cannot overwrite a prepared TLS IPC request.
+- `sdmc:/nce_diag_journal.log`
+- `sdmc:/nce_diag_result.json`
 
-Normal completion also writes `sdmc:/nce_diag_result.json` with a local-path fallback.
+with local-path fallbacks.
 
 ## Build
 
 Requirements: devkitPro, devkitA64, libnx.
 
+Full suite executable:
+
 ```sh
 make
 ```
 
-Expected executable:
+CINC-only executable without source edits:
 
-```text
-NCE-DIAG.nro
+```sh
+make TARGET=NCE-DIAG-CINC BUILD=build-cinc NCE_DIAG_DEFAULT_FIRST=1 NCE_DIAG_DEFAULT_LAST=1
 ```
 
-CI also verifies the embedded raw `CPU.NZCV.CINC.001` instruction shape. The standalone raw ELF/BIN remains an auxiliary build artifact only; it is not the final diagnostic deliverable.
+General compile-time range preset:
 
-See `docs/CHECKPOINTS.md`, `docs/RUN_SELECTION.md`, and `docs/TESTS.md`.
+```sh
+make TARGET=NCE-DIAG-RANGE BUILD=build-range NCE_DIAG_DEFAULT_FIRST=2 NCE_DIAG_DEFAULT_LAST=4
+```
+
+See `docs/CHECKPOINTS.md`, `docs/RUN_SELECTION.md`, `docs/TESTS.md`, and `docs/STARTUP_CRASH_20260912.md`.
