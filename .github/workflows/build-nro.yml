@@ -3,7 +3,7 @@ name: build-nro
 on:
   push:
     branches:
-      - feat/nce-diag-0.1-minimal
+      - feat/nce-diag-0.2-crash-observability
   pull_request:
     branches:
       - main
@@ -24,7 +24,7 @@ jobs:
             devkitpro/devkita64:20260219 \
             bash -lc 'make && make -C microtests'
 
-      - name: Verify executable milestone shape
+      - name: Verify crash-observable executable milestone shape
         run: |
           test -s NCE-DIAG.nro
           test -s NCE-DIAG.elf
@@ -32,13 +32,24 @@ jobs:
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work \
             devkitpro/devkita64:20260219 \
-            bash -lc '/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001 && /opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_nzcv_csel_probe && /opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm NCE-DIAG.elf | grep -q nce_diag_cpu_reg_preserve_probe'
+            bash -lc '
+              NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm
+              $NM NCE-DIAG.elf | grep -q nce_diag_raw_cpu_nzcv_cinc_001
+              $NM NCE-DIAG.elf | grep -q nce_diag_cpu_nzcv_csel_probe
+              $NM NCE-DIAG.elf | grep -q nce_diag_cpu_reg_preserve_probe
+              $NM NCE-DIAG.elf | grep -q nce_diag_checkpoint
+              $NM NCE-DIAG.elf | grep -q svcOutputDebugString
+              ! $NM NCE-DIAG.elf | grep -q " consoleInit$"
+            '
+          strings NCE-DIAG.nro | grep -q '0.2.0'
           strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CINC.001'
-          strings NCE-DIAG.nro | grep -q 'CPU.NZCV.CSEL.001'
-          strings NCE-DIAG.nro | grep -q 'CPU.REG.PRESERVE.001'
-          strings NCE-DIAG.nro | grep -q 'IPC.SM.GET_SERVICE.001'
           strings NCE-DIAG.nro | grep -q 'IPC.SVC21.REPEATED.001'
+          strings NCE-DIAG.nro | grep -q '10_PRE_SEQUENCE'
+          strings NCE-DIAG.nro | grep -q '30_PRE_SVC'
+          strings NCE-DIAG.nro | grep -q '40_POST_SVC'
+          strings NCE-DIAG.nro | grep -q 'nce_diag.cfg'
           strings NCE-DIAG.nro | grep -q 'nce_diag_result.json'
+          strings NCE-DIAG.nro | grep -q 'nce_diag_journal.log'
 
       - name: Verify auxiliary raw instruction shape
         run: |
@@ -50,7 +61,7 @@ jobs:
       - name: Upload executable NRO
         uses: actions/upload-artifact@v4
         with:
-          name: NCE-DIAG-0.1-executable
+          name: NCE-DIAG-0.2-crash-observable
           path: NCE-DIAG.nro
           if-no-files-found: error
 
