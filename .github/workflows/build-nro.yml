@@ -1,0 +1,32 @@
+name: build-nro
+
+on:
+  push:
+    branches:
+      - feat/nce-diag-0.1-minimal
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build NRO with devkitA64/libnx
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            devkitpro/devkita64:20260219 \
+            make
+
+      - name: Verify artifact
+        run: test -s NCE-DIAG.nro
+
+      - name: Upload NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: NCE-DIAG-nro
+          path: NCE-DIAG.nro
+          if-no-files-found: error
