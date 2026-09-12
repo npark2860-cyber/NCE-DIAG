@@ -54,18 +54,18 @@ jobs:
               test "$(grep -Ec "[[:space:]]bl[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_ctor.disasm)" -eq 3
               ! grep -Eq "[[:space:]]b[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_ctor.disasm
             '
-          strings NCE-DIAG.nro | grep -q '0.2.1'
-          strings NCE-DIAG.nro | grep -q '00_APP_INIT_ENTER'
-          strings NCE-DIAG.nro | grep -q '10_PRE_SM_INIT'
-          strings NCE-DIAG.nro | grep -q '30_APP_INIT_DONE'
-          strings NCE-DIAG.nro | grep -q '40_CTOR_ENTER'
-          strings NCE-DIAG.nro | grep -q '41_CTOR_DONE'
-          strings NCE-DIAG.nro | grep -q '42_POST_SECOND_RETURN'
-          strings NCE-DIAG.nro | grep -q '10_PRE_SEQUENCE'
-          strings NCE-DIAG.nro | grep -q '30_PRE_SVC'
-          strings NCE-DIAG.nro | grep -q '40_POST_SVC'
-          strings NCE-DIAG.nro | grep -q 'OPTIONAL_FS 30_PRE_SD_MOUNT'
-          strings NCE-DIAG.nro | grep -q 'RESULT_FILE SKIPPED mode=debug-only'
+          grep -aFq '0.2.1' NCE-DIAG.nro
+          grep -aFq '00_APP_INIT_ENTER' NCE-DIAG.nro
+          grep -aFq '10_PRE_SM_INIT' NCE-DIAG.nro
+          grep -aFq '30_APP_INIT_DONE' NCE-DIAG.nro
+          grep -aFq '40_CTOR_ENTER' NCE-DIAG.nro
+          grep -aFq '41_CTOR_DONE' NCE-DIAG.nro
+          grep -aFq '42_POST_SECOND_RETURN' NCE-DIAG.nro
+          grep -aFq '10_PRE_SEQUENCE' NCE-DIAG.nro
+          grep -aFq '30_PRE_SVC' NCE-DIAG.nro
+          grep -aFq '40_POST_SVC' NCE-DIAG.nro
+          grep -aFq 'OPTIONAL_FS 30_PRE_SD_MOUNT' NCE-DIAG.nro
+          grep -aFq 'RESULT_FILE SKIPPED mode=debug-only' NCE-DIAG.nro
 
       - name: Verify auxiliary raw instruction shape
         run: |
