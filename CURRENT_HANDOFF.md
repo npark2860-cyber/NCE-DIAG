@@ -6,44 +6,83 @@ Role: independent internal guest-side NCE diagnostic executable. Eden/Strato pro
 
 Current version: `0.2.1`.
 
-## Runtime evidence
+## Confirmed runtime evidence
 
-The original 0.2 executable terminated before `main()` in libnx default FS startup. A project-owned minimal `__appInit` now initializes SM only and leaves FS/SDMC opt-in.
+The pre-witness CINC-only build was run on Eden validation build `exp/imp-008e-windows-nce-rasterizer-recovery-runtime-58a7b77273`.
 
-Subsequent CINC-only runs proved guest execution progressed through startup and into the diagnostic output path. The latest probe run reached repeated SVC 0x27 boundaries but showed that normal diagnostic formatting itself entered newlib `snprintf/vsnprintf -> _svfprintf_r` dependency code before useful testcase text could be trusted as the crash boundary.
+Matching `NCE-DIAG-CINC.elf` symbolization established the following sequence:
+
+- seven normal lifecycle SVC 0x27 calls completed through `BEGIN CPU.NZCV.CINC.001`
+- checkpoint `00_ENTER` completed
+- checkpoint `10_PRE_SEQUENCE` completed
+- `nce_diag_raw_cpu_nzcv_cinc_001` executed and returned
+- Eden entered SVC 0x27 for the next checkpoint, `20_POST_SEQUENCE`
+- the final record was RunThread PRE `n=30`; no matching RunThread RETURN was recorded
+
+Therefore the strongest supported boundary is:
+
+```text
+CPU.NZCV.CINC.001
+10_PRE_SEQUENCE completed
+-> raw CINC sequence executed and returned
+-> 20_POST_SEQUENCE debug SVC entered
+-> host process terminated before that SVC returned
+```
+
+This is not a guest `TEST_FAIL`. The run did not reach `30_RESULT_CAPTURED` or `90_RESULT_RETURNED`.
+
+The run also exposed an observability gap: Eden records SVC 0x27 register state but does not include the `svcOutputDebugString` text payload in this log mode. Repeated checkpoints therefore needed ELF/control-flow reconstruction.
 
 ## Current implementation
 
 - strong project-owned `__appInit` / `__appExit`
 - startup initializes SM only
-- direct SVC 0x27 debug channel
 - no default applet/HID/time/FS/SDMC/console path before main
 - FS remains lazy and opt-in
 - full-suite and CINC-only executable NROs
 - stable testcase IDs unchanged
-- pre-marker run-id generation uses ordinary address/integer entropy, not `CNTPCT_EL0`
-- critical `nce_diag_logf`, `nce_diag_checkpoint`, and `nce_diag_checkpointf` formatting is project-owned and does not call `snprintf`, `vsnprintf`, or `_svfprintf_r`
-- temporary main/constructor/svfprintf dependency probe wrappers have been removed from the stable diagnostic path
-- CI checks the CINC `main()` for `CNTPCT`/`CNTVCT` and checks `build/harness.o` for forbidden formatted-libc dependencies
-- ELF/map artifacts are retained for guest-PC symbolization
+- run-id bootstrap does not read `CNTPCT_EL0`
+- critical diagnostic formatting is project-owned and does not call `snprintf`, `vsnprintf`, or `_svfprintf_r`
+- temporary constructor/main/svfprintf probes remain removed
+- all project-owned SVC 0x27 output is routed through `nce_diag_output_debug_string`
+- a `CKPT <test> <checkpoint>` line is parsed before the SVC and encoded into temporary x19/x20 witness tags
+- x19 test tag prefix: `0x4E43455400000000` (`NCET`)
+- x20 checkpoint tag prefix: `0x4E43454300000000` (`NCEC`)
+- low 32 bits are FNV-1a hashes of the test/checkpoint strings
+- original x19/x20 are restored after SVC return
+- `scripts/decode_eden_checkpoint.py` decodes witness tags directly from Eden `IMP008_REENTRY_STATE_PRE` lines
 
-## Validated build
+For `CPU.NZCV.CINC.001` the expected test witness is:
 
-Implementation commit: `446d0becca38fa6c8f64e83e7cf7bc1541a8be83` (`diag: make crash checkpoints libc-independent`).
+`x19=4E4345541715C97C`
 
-GitHub Actions run `34698719211`: PASS.
+Relevant checkpoint witnesses are:
 
-The run passed:
+- `00_ENTER` -> `x20=4E434543E1972DC0`
+- `10_PRE_SEQUENCE` -> `x20=4E434543B578118E`
+- `20_POST_SEQUENCE` -> `x20=4E434543F9A02A56`
+- `30_RESULT_CAPTURED` -> `x20=4E434543C3824CB1`
+- `90_RESULT_RETURNED` -> `x20=4E434543B4AFF18E`
 
-- default and CINC-only NRO build
-- libc-independent crash checkpoint validation
+## Validated witness build
+
+Validated implementation HEAD: `f27b3b41a36c320f8453050059ebbb8efaefda57`.
+
+GitHub Actions run `34702903483`: PASS.
+
+Validation includes:
+
+- full-suite and CINC-only NRO build
+- libc-independent checkpoint path
+- x19/x20 witness assembly shape and register restoration
+- witness decoder self-test
 - auxiliary raw instruction-shape validation
 - executable/debug-symbol/raw-microtest artifact upload
 
-Executable artifact: `NCE-DIAG-0.2.1-executables`, artifact ID `10299149605`, SHA-256 digest `d052bf3e67f850ccd495ede956753b80736591aac28773d95503c998413f9be4`.
+Executable artifact: `NCE-DIAG-0.2.1-executables`, artifact ID `10300611444`, SHA-256 digest `61457efa1a474405b7f57cedf2fab0dd78c3e8f12adc41694e4b565f911d0efd`.
 
 ## Runtime status
 
-The next required action is runtime validation of `NCE-DIAG-CINC.nro` from the validated executable artifact with config/persistence disabled.
+The next required runtime is the witness-enabled `NCE-DIAG-CINC.nro` from artifact `10300611444` with config/persistence disabled.
 
-Success is defined as observing named NCE-DIAG lifecycle/checkpoint text through `CPU.NZCV.CINC.001`. If Eden terminates, the last emitted `CKPT <test-id> <checkpoint-id>` is the authoritative diagnostic boundary.
+If Eden terminates again inside SVC 0x27, the final PRE line itself is now sufficient to identify the test/checkpoint without reading the debug-string payload or symbolizing the ELF.
