@@ -6,25 +6,31 @@ Validated x19-only witness build: `7c32133fb45c075197677eb71af786bee84837d5`.
 Validated CI run: `34703870644` PASS.
 Executable artifact ID: `10301306905`.
 
-Latest runtime result:
+Authoritative runtime result:
 
 ```text
-CPU.NZCV.CINC.001 / 00_ENTER returned
+CPU.NZCV.CINC.001 / 00_ENTER SVC 0x27 returned
 CPU.NZCV.CINC.001 / 10_PRE_SEQUENCE entered SVC 0x27
 no matching RETURN
 raw CINC sequence was not entered
 ```
 
-The previous safe witness still modified x20. Eden probed state relative to that temporary x20 value and produced observer-induced unmapped reads. The new harness path leaves x20 completely unchanged and carries the combined checkpoint witness only in x19.
+Observer-side ambiguity is resolved:
+
+- current witness changes x19 only
+- x20 is not touched by the witness emitter
+- the prior checkpoint-adjacent x20-induced unmapped signature is gone
+- therefore this boundary should now be treated as a production Eden/NCE failure boundary, not a diagnostic-harness artifact
 
 Next action:
 
-1. Run `NCE-DIAG-CINC.nro` from artifact `10301306905` with config/persistence disabled.
-2. Capture the Eden log through normal exit or host termination.
-3. Use the final SVC 0x27 PRE record with `x19=4E434557xxxxxxxx` as the checkpoint identity.
-4. Confirm that the prior x20-related unmapped-read signature is gone.
-5. If `10_PRE_SEQUENCE` returns, continue classification using the next x19 witness. If it does not return, treat the SVC 0x27 boundary itself as the current host-failure boundary.
-6. Only after CINC-only is runtime-stable run the full five-test suite unchanged.
+1. Do not modify NCE-DIAG further for this failure.
+2. Hand the boundary to the Windows ARM64 NCE production investigation.
+3. Production-side target is the second project-owned `svcOutputDebugString` / SVC 0x27 re-entry: `10_PRE_SEQUENCE`.
+4. Do not classify the host exit as guest `TEST_FAIL`.
+5. Do not investigate the raw CINC instruction sequence yet; it was not entered.
+6. After a production Eden/NCE change is available, rerun the same `NCE-DIAG-CINC.nro` unchanged.
+7. Only if `10_PRE_SEQUENCE` returns should classification continue to the next witness (`20_POST_SEQUENCE`) and eventually the full five-test suite.
 
 Known CINC x19 witnesses:
 
