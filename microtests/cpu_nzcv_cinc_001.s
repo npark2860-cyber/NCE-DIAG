@@ -1,6 +1,6 @@
 .section .text.entry, "ax", %progbits
 .balign 16
-.include "cpu_nzcv_cinc_core.inc"
+.include "../include/cpu_nzcv_cinc_core.inc"
 
 .global nce_diag_raw_cpu_nzcv_cinc_001
 .type nce_diag_raw_cpu_nzcv_cinc_001, %function
