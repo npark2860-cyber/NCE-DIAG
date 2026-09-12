@@ -24,13 +24,14 @@ jobs:
             devkitpro/devkita64:20260219 \
             bash -lc 'make && make TARGET=NCE-DIAG-CINC BUILD=build-cinc NCE_DIAG_DEFAULT_FIRST=1 NCE_DIAG_DEFAULT_LAST=1 && make -C microtests'
 
-      - name: Verify minimal startup and libc-independent crash checkpoints
+      - name: Verify minimal startup and crash checkpoint witness
         run: |
           set -euo pipefail
           test -s NCE-DIAG.nro
           test -s NCE-DIAG.elf
           test -s NCE-DIAG-CINC.nro
           test -s NCE-DIAG-CINC.elf
+          python3 scripts/decode_eden_checkpoint.py --self-test
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work \
@@ -46,17 +47,25 @@ jobs:
               $NM NCE-DIAG.elf | grep -q nce_diag_checkpoint
               $NM NCE-DIAG.elf | grep -q nce_diag_checkpointf
               $NM NCE-DIAG.elf | grep -q nce_diag_logf
+              $NM NCE-DIAG.elf | grep -q nce_diag_output_debug_string
+              $NM NCE-DIAG.elf | grep -q nce_diag_emit_debug_witness
               $NM NCE-DIAG.elf | grep -q svcOutputDebugString
               ! $NM NCE-DIAG.elf | grep -q " consoleInit$"
               ! $NM NCE-DIAG.elf | grep -Eq "__wrap_(main|nce_diag_set_run_id|vsnprintf|_svfprintf_r|_localeconv_r|strlen|memset|__getreent|__locale_mb_cur_max|_malloc_r)"
               ! $NM NCE-DIAG.elf | grep -q nce_diag_pre_main_constructor_probe
               ! $NM -u build/harness.o | grep -E "(^|[[:space:]])(snprintf|vsnprintf|_svfprintf_r|strlen|memset|malloc)$"
+              ! $NM -u build/debug_witness.o | grep -E "(^|[[:space:]])(snprintf|vsnprintf|_svfprintf_r|strlen|memset|malloc)$"
               $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<main>:/,/^$/p" > /tmp/nce_diag_main.disasm
               ! grep -Eiq "cntpct|cntvct" /tmp/nce_diag_main.disasm
               grep -q "nce_diag_set_run_id" /tmp/nce_diag_main.disasm
               grep -q "nce_diag_logf" /tmp/nce_diag_main.disasm
               $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<nce_diag_checkpoint>:/,/^$/p" > /tmp/nce_diag_checkpoint.disasm
               ! grep -Eiq "snprintf|vsnprintf|svfprintf|localeconv|malloc" /tmp/nce_diag_checkpoint.disasm
+              $OBJDUMP -d NCE-DIAG-CINC.elf | sed -n "/<nce_diag_emit_debug_witness>:/,/^$/p" > /tmp/nce_diag_witness.disasm
+              grep -Eq "mov[[:space:]]+x19,[[:space:]]*x2" /tmp/nce_diag_witness.disasm
+              grep -Eq "mov[[:space:]]+x20,[[:space:]]*x3" /tmp/nce_diag_witness.disasm
+              grep -Eq "bl[[:space:]].*<svcOutputDebugString>" /tmp/nce_diag_witness.disasm
+              grep -Eq "ldp[[:space:]]+x19,[[:space:]]*x20" /tmp/nce_diag_witness.disasm
             '
           grep -aFq '0.2.1' NCE-DIAG.nro
           grep -aFq '00_APP_INIT_ENTER' NCE-DIAG.nro
@@ -65,6 +74,7 @@ jobs:
           ! grep -aFq '40_CTOR_ENTER' NCE-DIAG.nro
           ! grep -aFq '43_TICK_OK' NCE-DIAG.nro
           grep -aFq '10_PRE_SEQUENCE' NCE-DIAG.nro
+          grep -aFq '20_POST_SEQUENCE' NCE-DIAG.nro
           grep -aFq '30_PRE_SVC' NCE-DIAG.nro
           grep -aFq '40_POST_SVC' NCE-DIAG.nro
           grep -aFq 'OPTIONAL_FS 30_PRE_SD_MOUNT' NCE-DIAG.nro

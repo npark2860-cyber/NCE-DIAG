@@ -69,3 +69,15 @@ TestResult run_cpu_nzcv_csel_001(void);
 TestResult run_cpu_reg_preserve_001(void);
 TestResult run_ipc_sm_get_service_001(void);
 TestResult run_ipc_svc21_repeated_001(void);
+
+/*
+ * All project-owned debug output is routed through a witness wrapper.  For
+ * lines containing " CKPT <test> <checkpoint>", the wrapper temporarily loads
+ * x19/x20 with NCET/NCEC hash tags before issuing SVC 0x27, then restores the
+ * original callee-saved registers after the SVC returns.  Eden's existing NCE
+ * RunThread diagnostic already records x19/x20 on SVC entry, so a host crash
+ * inside SVC 0x27 still leaves an independently decodable checkpoint witness.
+ */
+uint32_t nce_diag_output_debug_string(const char *text, uint64_t length);
+#define svcOutputDebugString(text, length) \
+    nce_diag_output_debug_string((text), (uint64_t)(length))
