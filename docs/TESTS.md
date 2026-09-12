@@ -1,25 +1,23 @@
 # Test registry
 
-| Test ID | Input / action | Expected | Runtime status |
-| --- | --- | --- | --- |
-| `CPU.NZCV.CINC.001` | `w16=0`, CMP -> x18-sensitive STP -> CINC NE | result `2`, NZCV `0x60000000` preserved | pending |
-| `CPU.NZCV.CSEL.001` | compare `5` and `7`, CSEL LT | result `5`, NZCV `0x80000000` preserved | pending |
-| `CPU.REG.PRESERVE.001` | seed x19-x28, direct BL/RET, compare | mismatch mask `0` | pending |
-| `IPC.SM.GET_SERVICE.001` | CMIF `sm:GetServiceOriginal("fsp-srv")` | valid moved handle, close succeeds | pending |
-| `IPC.SVC21.REPEATED.001` | 16 repeated GetService requests on the same SM session | 16/16 complete | pending |
+Stable 1-based registry order:
 
-All five tests are included in the executable NRO and are executed automatically in the order above.
+| Index | Test ID | 0.2 checkpoint focus |
+| ---: | --- | --- |
+| 1 | CPU.NZCV.CINC.001 | `10_PRE_SEQUENCE -> 20_POST_SEQUENCE -> 30_RESULT_CAPTURED` |
+| 2 | CPU.NZCV.CSEL.001 | `10_PRE_SEQUENCE -> 20_POST_SEQUENCE -> 30_RESULT_CAPTURED` |
+| 3 | CPU.REG.PRESERVE.001 | `10_PRE_SEQUENCE -> 20_POST_SEQUENCE -> 30_RESULT_CAPTURED` |
+| 4 | IPC.SM.GET_SERVICE.001 | `20_REQUEST_BUILT -> 30_PRE_SVC -> 40_POST_SVC -> 50_RESULT_PARSED` |
+| 5 | IPC.SVC21.REPEATED.001 | same IPC boundary plus `iter=NN`, repeated 16 times |
 
-## Output contract
+Each testcase also receives harness-level `00_ENTER` and `90_RESULT_RETURNED` checkpoints plus immediate `PASS`/`FAIL` and `END` lifecycle markers.
 
-Each test returns:
+## CPU.NZCV.CINC.001
 
-- stable ID
-- PASS/FAIL/SKIP
-- expected
-- actual
-- Result code
-- NZCV before/after when relevant
-- diagnostic detail string
+Input remains `w16 = 0`; expected result remains `2`; expected NZCV before and after the x18-sensitive store pair remains `0x60000000`.
 
-The executable writes a JSON result object containing summary counts and all test records.
+The raw architectural sequence is not interrupted by logging. `10_PRE_SEQUENCE` is emitted before entering the assembly routine and `20_POST_SEQUENCE` only after the routine returns.
+
+## IPC SVC boundary
+
+The two existing IPC tests now explicitly separate CMIF request creation from `svcSendSyncRequest` and response parsing. This makes SVC 0x21 crashes distinguishable from request-build and response-parse crashes without changing the stable testcase IDs.

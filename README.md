@@ -2,59 +2,73 @@
 
 Independent internal guest-side conformance and diagnostic workload for Windows ARM64 NCE validation.
 
-NCE-DIAG is an executable diagnostic application, not a source-only or raw-blob project. The primary deliverable is `NCE-DIAG.nro`, which runs the test suite automatically, prints PASS/FAIL, writes a machine-readable result file, and exits without user input.
+## 0.2 crash-observability milestone
 
-Eden/Strato production implementation repositories are reference-only from this project.
+Primary artifact: `NCE-DIAG.nro`.
 
-## 0.1 executable target
+The 0.2 harness is designed for the case where the Eden host process itself may terminate during a guest test. The primary diagnostic channel is a direct `svcOutputDebugString` call (SVC 0x27), not GUI rendering and not the final JSON file.
 
-Current build candidate contains all first-milestone tests:
-
-| Test ID | Semantic | Implementation | Runtime validation |
-| --- | --- | --- | --- |
-| `CPU.NZCV.CINC.001` | NZCV preservation through x18-sensitive STP before CINC | embedded raw ARM64 routine | pending |
-| `CPU.NZCV.CSEL.001` | conditional select and NZCV preservation | ARM64 routine | pending |
-| `CPU.REG.PRESERVE.001` | x19-x28 preservation across direct BL/RET | ARM64 routine | pending |
-| `IPC.SM.GET_SERVICE.001` | real SM GetService moved-handle path | libnx CMIF over real SM session | pending |
-| `IPC.SVC21.REPEATED.001` | repeated synchronous IPC on one SM session | 16 repeated CMIF GetService requests | pending |
-
-## Automatic execution flow
+Every testcase follows:
 
 ```text
-NCE-DIAG.nro
-  -> start
-  -> run all five tests
-  -> print per-test PASS/FAIL
-  -> print summary
-  -> write sdmc:/nce_diag_result.json
-     (fallback: nce_diag_result.json)
-  -> exit automatically
+BEGIN
+CKPT before dangerous operation
+CKPT after dangerous operation
+PASS / FAIL
+END
 ```
 
-No controller input is required.
+If the host disappears after a PRE checkpoint and before the matching POST checkpoint, the last Eden guest-debug line defines the crash boundary.
 
-## Build baseline
+No GPU console, HID polling loop, audio, network, or presentation path is required by the harness.
 
-Validated GitHub Actions run: `34676758424`
+## Included stable tests
 
-Validated source HEAD for the executable artifact: `b557e6139dae7b92182c4f51df3bd51793912406`
+1. `CPU.NZCV.CINC.001`
+2. `CPU.NZCV.CSEL.001`
+3. `CPU.REG.PRESERVE.001`
+4. `IPC.SM.GET_SERVICE.001`
+5. `IPC.SVC21.REPEATED.001`
 
-Primary artifact: `NCE-DIAG-0.1-executable`, artifact ID `10292253583`.
+No new testcase was added for 0.2; this milestone changes observability and execution control only.
 
-`NCE-DIAG.nro` SHA-256:
+## Selection
+
+Default: run the full suite.
+
+Command-line forms:
 
 ```text
-ed16d5872ca1b3ddab3aebd9388db448fb2b0b054047a1ea0941007f66c026d7
+--all
+--test=CPU.NZCV.CINC.001
+--range=1-3
+--persist
+--debug-only
+--no-config
 ```
 
-CI verifies:
+If no explicit test/range argument is supplied, the harness looks for `sdmc:/nce_diag.cfg`, then `nce_diag.cfg`.
 
-- `NCE-DIAG.nro` exists and is non-empty
-- embedded raw CINC symbol exists in the executable ELF
-- CSEL and register-preservation assembly symbols exist
-- all five stable test IDs are present in the NRO
-- result-file path is present
-- auxiliary raw CINC microtest still matches the intended instruction sequence
+Config examples:
+
+```text
+run=all
+persist=0
+```
+
+```text
+test=CPU.NZCV.CINC.001
+persist=0
+```
+
+```text
+range=4-5
+persist=1
+```
+
+Persistent mode appends safe lifecycle markers to `sdmc:/nce_diag_journal.log` (fallback: local path) and flushes each record. Internal CKPT markers remain debug-output only so file IPC cannot overwrite a prepared TLS IPC request.
+
+Normal completion also writes `sdmc:/nce_diag_result.json` with a local-path fallback.
 
 ## Build
 
@@ -64,18 +78,12 @@ Requirements: devkitPro, devkitA64, libnx.
 make
 ```
 
-Primary output:
+Expected executable:
 
 ```text
 NCE-DIAG.nro
 ```
 
-The standalone raw ELF/BIN remains an auxiliary development artifact only. It is not the user-facing completion target.
+CI also verifies the embedded raw `CPU.NZCV.CINC.001` instruction shape. The standalone raw ELF/BIN remains an auxiliary build artifact only; it is not the final diagnostic deliverable.
 
-## Completion state
-
-Executable build/packaging: PASS.
-
-Eden/real-Switch runtime execution: pending.
-
-NCE-DIAG 0.1 is not considered complete until the same NRO boots in Eden, executes all five tests, writes the result file, and exits normally.
+See `docs/CHECKPOINTS.md`, `docs/RUN_SELECTION.md`, and `docs/TESTS.md`.

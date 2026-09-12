@@ -1,51 +1,30 @@
 # CURRENT_HANDOFF
 
-Branch: `feat/nce-diag-0.1-minimal`
+Branch: `feat/nce-diag-0.2-crash-observability`
 
-Current HEAD before this documentation commit: `b557e6139dae7b92182c4f51df3bd51793912406`.
+Role: independent internal guest-side NCE diagnostic executable. Eden/Strato production implementation remains read-only from this project.
 
-Project role: internal executable guest-side conformance/diagnostic bench for Windows ARM64 NCE. Eden/Strato production code is not modified here.
+0.2 scope: crash observability only; no new testcase IDs added.
 
-## Current executable state
+Implemented:
 
-`NCE-DIAG.nro` is now the primary target and contains all first-milestone tests:
+- direct `svcOutputDebugString` primary logging
+- run ID on every diagnostic line
+- startup markers
+- testcase `BEGIN`, internal stable `CKPT`, immediate `PASS`/`FAIL`, `END`
+- CPU raw-sequence checkpoints outside architectural-state-sensitive assembly
+- explicit IPC request-build / PRE_SVC / POST_SVC / parse boundaries
+- repeated IPC iteration number in checkpoint output
+- optional flushed lifecycle journal; internal CKPT remains filesystem-free
+- suite, single-test, and 1-based range selection
+- GUI console initialization removed
+- normal-completion JSON result retained
 
-- `CPU.NZCV.CINC.001`
-- `CPU.NZCV.CSEL.001`
-- `CPU.REG.PRESERVE.001`
-- `IPC.SM.GET_SERVICE.001`
-- `IPC.SVC21.REPEATED.001`
+Build validation at source commit `86d7eef1577a568a92e9c63606b3beb865adc94a` passed executable-shape and auxiliary raw-shape checks in workflow run `34677885223` before this documentation-only commit.
 
-Runtime behavior implemented:
+Runtime status:
 
-1. start automatically;
-2. execute all five tests;
-3. print per-test PASS/FAIL and summary;
-4. print detailed state for failures;
-5. write JSON to `sdmc:/nce_diag_result.json`, with relative-path fallback;
-6. exit automatically after output flush.
+- previous 0.1 NRO: Eden load/boot and guest execution observed, then host process crash
+- 0.2 crash-observable NRO: build validated; Eden runtime checkpoint capture pending
 
-The CINC raw ARM64 microtest is embedded directly in the NRO and called by the harness. The standalone raw ELF/BIN remains auxiliary only.
-
-## Validated build baseline
-
-GitHub Actions run: `34676758424` — PASS.
-
-Executable artifact ID: `10292253583` (`NCE-DIAG-0.1-executable`).
-
-Artifact ZIP digest: `sha256:ce3ca0999b176bb97f05e1d9162686b6147bf5023b8de495fb90ecab1c51051d`.
-
-Extracted `NCE-DIAG.nro` SHA-256:
-`ed16d5872ca1b3ddab3aebd9388db448fb2b0b054047a1ea0941007f66c026d7`.
-
-CI verified executable build, embedded test symbols, all five IDs, JSON output path, and auxiliary raw instruction shape.
-
-## Not yet claimed
-
-- Eden boot PASS
-- real Switch boot PASS
-- actual five-test runtime results
-- JSON file creation observed on target
-- normal target exit observed
-
-Therefore first milestone is build-complete but runtime-open. Do not declare NCE-DIAG 0.1 complete until target execution evidence is captured.
+Do not add new tests until the 0.2 NRO is run in Eden and the last guest-side checkpoint is captured.
