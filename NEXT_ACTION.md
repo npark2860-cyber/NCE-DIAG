@@ -2,39 +2,34 @@
 
 Do not add new testcase IDs.
 
-Validated witness implementation: `f27b3b41a36c320f8453050059ebbb8efaefda57`.
-Validated CI run: `34702903483` PASS.
-Executable artifact ID: `10300611444`.
+Validated x19-only witness build: `7c32133fb45c075197677eb71af786bee84837d5`.
+Validated CI run: `34703870644` PASS.
+Executable artifact ID: `10301306905`.
 
-Confirmed previous CINC boundary:
+Latest runtime result:
 
 ```text
-00_ENTER completed
-10_PRE_SEQUENCE completed
-raw CINC sequence returned
-20_POST_SEQUENCE SVC 0x27 entered
-host terminated before SVC return
+CPU.NZCV.CINC.001 / 00_ENTER returned
+CPU.NZCV.CINC.001 / 10_PRE_SEQUENCE entered SVC 0x27
+no matching RETURN
+raw CINC sequence was not entered
 ```
+
+The previous safe witness still modified x20. Eden probed state relative to that temporary x20 value and produced observer-induced unmapped reads. The new harness path leaves x20 completely unchanged and carries the combined checkpoint witness only in x19.
 
 Next action:
 
-1. Run `NCE-DIAG-CINC.nro` from artifact `10300611444` with config/persistence disabled.
-2. Capture the Eden log from boot until normal exit or host-process termination.
-3. Inspect the final `IMP008_REENTRY_STATE_PRE` SVC 0x27 line.
-4. A witness checkpoint has `x19=4E434554xxxxxxxx` and `x20=4E434543xxxxxxxx`.
-5. Decode directly with `python3 scripts/decode_eden_checkpoint.py <eden_log>` or use the known CINC tags below.
+1. Run `NCE-DIAG-CINC.nro` from artifact `10301306905` with config/persistence disabled.
+2. Capture the Eden log through normal exit or host termination.
+3. Use the final SVC 0x27 PRE record with `x19=4E434557xxxxxxxx` as the checkpoint identity.
+4. Confirm that the prior x20-related unmapped-read signature is gone.
+5. If `10_PRE_SEQUENCE` returns, continue classification using the next x19 witness. If it does not return, treat the SVC 0x27 boundary itself as the current host-failure boundary.
+6. Only after CINC-only is runtime-stable run the full five-test suite unchanged.
 
-CINC witness values:
+Known CINC x19 witnesses:
 
-- test `CPU.NZCV.CINC.001`: `x19=4E4345541715C97C`
-- `00_ENTER`: `x20=4E434543E1972DC0`
-- `10_PRE_SEQUENCE`: `x20=4E434543B578118E`
-- `20_POST_SEQUENCE`: `x20=4E434543F9A02A56`
-- `30_RESULT_CAPTURED`: `x20=4E434543C3824CB1`
-- `90_RESULT_RETURNED`: `x20=4E434543B4AFF18E`
-
-Primary success criterion: CINC reaches `90_RESULT_RETURNED` and PASS/END.
-
-If the host terminates again, the final witness PRE line is the authoritative guest boundary. Do not infer guest TEST_FAIL from a host-process termination and do not reintroduce the old formatter probes.
-
-Only after the CINC-only path is runtime-stable should the full five-test suite be run unchanged.
+- `00_ENTER` -> `4E434557672A5071`
+- `10_PRE_SEQUENCE` -> `4E434557546DD9AD`
+- `20_POST_SEQUENCE` -> `4E4345578493EDB7`
+- `30_RESULT_CAPTURED` -> `4E434557EA0D5FDC`
+- `90_RESULT_RETURNED` -> `4E434557E41DEE7F`
