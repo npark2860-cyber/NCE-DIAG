@@ -1,4 +1,4 @@
-name: Build D3DX9_43 ARM64
+name: Build FBNeo DX9 ARM64 Runtime
 
 on:
   push:
@@ -58,35 +58,48 @@ jobs:
             -DARCH:STRING=arm64 `
             -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build d3dx9_43 only
+      - name: Build runtime DLLs
         shell: pwsh
-        run: cmake --build build --target d3dx9_43 -- -k0
+        run: cmake --build build --target d3dx9_43 d3dcompiler_43 d3dxof -- -k0
 
-      - name: Collect and verify DLL
+      - name: Collect and verify runtime
         shell: pwsh
         run: |
-          $dll = Get-ChildItem -Path build -Recurse -Filter d3dx9_43.dll | Select-Object -First 1
-          if (-not $dll) { throw 'd3dx9_43.dll was not produced' }
           New-Item -ItemType Directory -Force artifact | Out-Null
-          Copy-Item $dll.FullName artifact\D3DX9_43.dll
-          dumpbin /headers artifact\D3DX9_43.dll | Tee-Object -FilePath artifact\PE_HEADERS.txt
-          dumpbin /exports artifact\D3DX9_43.dll | Tee-Object -FilePath artifact\EXPORTS.txt
-          dumpbin /dependents artifact\D3DX9_43.dll | Tee-Object -FilePath artifact\DEPENDENTS.txt
+
+          $files = @(
+            @{ Search='d3dx9_43.dll';      Out='D3DX9_43.dll' },
+            @{ Search='d3dcompiler_43.dll'; Out='D3DCompiler_43.dll' },
+            @{ Search='d3dxof.dll';         Out='D3DXOF.dll' }
+          )
+
+          foreach ($f in $files) {
+            $dll = Get-ChildItem -Path build -Recurse -Filter $f.Search | Select-Object -First 1
+            if (-not $dll) { throw "$($f.Search) was not produced" }
+            Copy-Item $dll.FullName (Join-Path artifact $f.Out)
+            dumpbin /headers (Join-Path artifact $f.Out) | Set-Content (Join-Path artifact "$($f.Out).HEADERS.txt")
+            dumpbin /dependents (Join-Path artifact $f.Out) | Set-Content (Join-Path artifact "$($f.Out).DEPENDENTS.txt")
+          }
+
+          dumpbin /exports artifact\D3DX9_43.dll | Set-Content artifact\D3DX9_43.EXPORTS.txt
+
           @(
             'Source: https://github.com/reactos/reactos',
             "Source commit: $(git -C src rev-parse HEAD)",
             'Patch: remove ReactOS oldnames static library from standalone D3DX target',
             'Patch: map legacy stricmp call to MSVC _stricmp',
-            'Target: d3dx9_43',
+            'Targets: d3dx9_43, d3dcompiler_43, d3dxof',
             'Architecture: Windows ARM64',
             'Configuration: Release',
+            'Use: place the three DLLs beside the ARM64 FBNeo executable for testing',
             "Built at UTC: $([DateTime]::UtcNow.ToString('o'))"
           ) | Set-Content artifact\BUILD_INFO.txt
-          Get-FileHash artifact\D3DX9_43.dll -Algorithm SHA256 | Format-List | Out-String | Set-Content artifact\SHA256.txt
 
-      - name: Upload D3DX9_43 ARM64
+          Get-ChildItem artifact -Filter *.dll | Get-FileHash -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content artifact\SHA256.txt
+
+      - name: Upload FBNeo DX9 ARM64 runtime
         uses: actions/upload-artifact@v4
         with:
-          name: d3dx9_43-windows-arm64
+          name: fbneo-dx9-arm64-runtime
           path: artifact
           if-no-files-found: error
