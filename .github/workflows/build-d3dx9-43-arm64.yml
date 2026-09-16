@@ -36,13 +36,19 @@ jobs:
       - name: Patch standalone ARM64 D3DX build
         shell: pwsh
         run: |
-          $path = 'src\dll\directx\wine\d3dx9_36\d3dx9.cmake'
-          $text = Get-Content $path -Raw
+          $cmakePath = 'src\dll\directx\wine\d3dx9_36\d3dx9.cmake'
+          $text = Get-Content $cmakePath -Raw
           $old = 'target_link_libraries(${module} dxguid wine oldnames)'
           $new = 'target_link_libraries(${module} dxguid wine)'
           if (-not $text.Contains($old)) { throw 'Expected oldnames link line not found' }
           $text = $text.Replace($old, $new)
-          Set-Content -Path $path -Value $text -NoNewline
+          Set-Content -Path $cmakePath -Value $text -NoNewline
+
+          $effectPath = 'src\dll\directx\wine\d3dx9_36\effect.c'
+          $effect = Get-Content $effectPath -Raw
+          if (-not $effect.Contains('stricmp(')) { throw 'Expected stricmp call not found' }
+          $effect = $effect.Replace('stricmp(', '_stricmp(')
+          Set-Content -Path $effectPath -Value $effect -NoNewline
 
       - name: Configure ReactOS ARM64
         shell: pwsh
@@ -65,10 +71,12 @@ jobs:
           Copy-Item $dll.FullName artifact\D3DX9_43.dll
           dumpbin /headers artifact\D3DX9_43.dll | Tee-Object -FilePath artifact\PE_HEADERS.txt
           dumpbin /exports artifact\D3DX9_43.dll | Tee-Object -FilePath artifact\EXPORTS.txt
+          dumpbin /dependents artifact\D3DX9_43.dll | Tee-Object -FilePath artifact\DEPENDENTS.txt
           @(
             'Source: https://github.com/reactos/reactos',
             "Source commit: $(git -C src rev-parse HEAD)",
             'Patch: remove ReactOS oldnames static library from standalone D3DX target',
+            'Patch: map legacy stricmp call to MSVC _stricmp',
             'Target: d3dx9_43',
             'Architecture: Windows ARM64',
             'Configuration: Release',
